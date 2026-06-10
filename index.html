@@ -782,6 +782,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 let me = null;
 let myName = "";
 let matches = [];
@@ -1093,7 +1094,7 @@ async function togglePicks(m, card){
       const tag = pts == null ? "" : ` · ${pts} pts`;
       const isMe = p.user_id === me.id;
       return `<div class="picks-row${isMe ? " me" : ""}">
-        <span class="name">${p.profiles?.display_name || "?"}${isMe ? " (tú)" : ""}</span>
+        <span class="name">${esc(p.profiles?.display_name || "?")}${isMe ? " (tú)" : ""}</span>
         <span class="score">${p.home_pred}–${p.away_pred}${tag}</span>
       </div>`;
     })
@@ -1141,7 +1142,7 @@ function pintarTabla(fase, el, rows){
     ${list.map((r,i) => `
       <div class="lb-row ${r.user_id === me.id ? "me" : ""}">
         <span class="col-num">${medalla(i)}</span>
-        <span class="name">${r.display_name}</span>
+        <span class="name">${esc(r.display_name)}</span>
         <span class="col-x num">${r.exact_hits}</span>
         <span class="col-r num">${r.result_hits}</span>
         <span class="col-j num">${r.scored_matches}</span>
@@ -1177,7 +1178,7 @@ function pintarTablaCompact(fase, el, rows){
     ${list.map((r,i) => `
       <div class="lb-row ${r.user_id === me.id ? "me" : ""}">
         <span class="col-num">${medalla(i)}</span>
-        <span class="name">${r.display_name}</span>
+        <span class="name">${esc(r.display_name)}</span>
         <span class="col-x num">${r.exact_hits}</span>
         <span class="col-pts pts">${r.total_points}</span>
       </div>`).join("")}
