@@ -1,0 +1,28 @@
+# Documentación local
+README.md
+
+# SQL — esquema y scripts de base de datos
+*.sql
+
+# Variables de entorno — NUNCA subir al repo
+.env
+.env.*
+*.env
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Archivos de macOS
+.DS_Store
+
+# Archivos de Windows
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,31 @@
+name: Sincronizar resultados del Mundial
+
+on:
+  schedule:
+    # Cada 15 minutos durante el torneo
+    - cron: '*/15 * * * *'
+  # Permite dispararlo manualmente desde la pestaña Actions de GitHub
+  # (útil para la primera ejecución que siembra los 104 partidos)
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Sincronizar partidos y resultados
+        run: python update_results.py
+        env:
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
