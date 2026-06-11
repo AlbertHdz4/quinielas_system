@@ -567,6 +567,64 @@
   .medal.m2{background:#C9CDD2;color:#2C3035}
   .medal.m3{background:#CD8B5F;color:#3B1F0C}
 
+  /* Countdown dentro del banner de pendientes */
+  .pending-banner .countdown{
+    margin-left:auto;font-family:'Roboto Mono',monospace;font-size:12px;font-weight:600;
+    white-space:nowrap;
+  }
+
+  /* Consenso del grupo */
+  .consensus{
+    margin-top:12px;padding-top:12px;
+    border-top:1px solid var(--md-outline-variant);
+  }
+  .consensus-label{
+    font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;
+    color:var(--md-on-surface-var);margin-bottom:8px;
+  }
+  .consensus-row{display:flex;gap:8px}
+  .consensus-item{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+    background:var(--md-surface-c-high);border-radius:var(--shape-s);padding:8px 4px;
+  }
+  .consensus-item.winner{background:var(--md-primary-container)}
+  .consensus-item .c-count{
+    font-family:'Roboto Mono',monospace;font-weight:700;font-size:20px;
+    color:var(--md-on-surface);
+  }
+  .consensus-item.winner .c-count{color:var(--md-on-primary-cont)}
+  .consensus-item .c-label{font-size:11px;color:var(--md-on-surface-var);text-align:center}
+  .consensus-item.winner .c-label{color:var(--md-on-primary-cont)}
+
+  /* Stats modal */
+  .stats-summary{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px;
+  }
+  .stat-box{
+    background:var(--md-surface-c-high);border-radius:var(--shape-m);
+    padding:10px 8px;text-align:center;
+  }
+  .stat-box .s-val{
+    font-family:'Roboto Mono',monospace;font-weight:700;font-size:22px;
+    color:var(--md-tertiary);
+  }
+  .stat-box .s-lbl{font-size:11px;color:var(--md-on-surface-var);margin-top:2px}
+  .stats-list{max-height:320px;overflow-y:auto;margin:0 -4px}
+  .stats-match{
+    display:grid;grid-template-columns:1fr auto auto;
+    align-items:center;gap:8px;
+    padding:10px 4px;border-bottom:1px solid var(--md-outline-variant);
+    font-size:13px;
+  }
+  .stats-match:last-child{border-bottom:none}
+  .stats-match .sm-teams{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stats-match .sm-result{font-size:11px;color:var(--md-on-surface-var);margin-top:2px}
+  .stats-match .sm-pred{font-family:'Roboto Mono',monospace;font-weight:600;white-space:nowrap}
+
+  /* Nombre clickeable en tabla */
+  .player-link{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+  .player-link:hover{color:var(--md-primary)}
+
   /* leyenda debajo de la tabla de posiciones */
   .lb-legend{
     font-size:11px;color:var(--md-on-surface-var);
@@ -682,6 +740,19 @@
   </div>
 </div>
 
+<!-- ===================== STATS MODAL ===================== -->
+<div id="stats-modal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h2 id="stats-title">Estadísticas</h2>
+      <button class="icon-btn" id="stats-close-btn" aria-label="Cerrar">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+    <div id="stats-body"></div>
+  </div>
+</div>
+
 <!-- ===================== PROFILE MODAL ===================== -->
 <div id="profile-modal" class="modal-overlay hidden">
   <div class="modal">
@@ -742,6 +813,7 @@
           <div id="pending-banner" class="pending-banner hidden">
             <span class="material-symbols-rounded">edit_note</span>
             <span id="pending-text"></span>
+            <span id="countdown-text" class="countdown hidden"></span>
           </div>
           <div class="chip-row" role="tablist">
             <button class="chip" id="chip-grupos" aria-selected="true">Fase de grupos</button>
@@ -751,6 +823,11 @@
         </section>
 
         <section id="view-tabla" class="hidden">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+            <button class="text-btn" id="share-btn" style="display:inline-flex;align-items:center;gap:6px;font-size:13px">
+              <span class="material-symbols-rounded" style="font-size:18px">share</span>Compartir
+            </button>
+          </div>
           <div class="lb-section">
             <h3><span class="material-symbols-rounded">emoji_events</span> Fase de grupos</h3>
             <div class="lb-card" id="lb-grupos"></div>
@@ -818,6 +895,8 @@ let matches = [];
 let myPreds = {};
 let phase = "grupos";
 let saveTimers = {};
+let lbRows = [];
+let countdownInterval = null;
 
 /* ---------------- AUTH ---------------- */
 let signupMode = false;
@@ -971,6 +1050,8 @@ function renderMatches(){
   } else {
     banner.classList.add("hidden");
   }
+
+  startCountdown();
 
   if (!list.length){
     box.innerHTML = `
@@ -1127,17 +1208,17 @@ async function togglePicks(m, card){
         <span class="score">${p.home_pred}–${p.away_pred}${tag}</span>
       </div>`;
     })
-    .join("");
+    .join("") + renderConsensus(data, m);
 }
 
 /* ---------------- TABLA ---------------- */
 async function renderLeaderboards(){
   const { data } = await db.from("leaderboard").select("*");
-  const rows = data || [];
-  pintarTabla("grupos", $("lb-grupos"), rows);
-  pintarTabla("eliminatorias", $("lb-elim"), rows);
-  pintarTablaCompact("grupos", $("side-lb-grupos"), rows);
-  pintarTablaCompact("eliminatorias", $("side-lb-elim"), rows);
+  lbRows = data || [];
+  pintarTabla("grupos", $("lb-grupos"), lbRows);
+  pintarTabla("eliminatorias", $("lb-elim"), lbRows);
+  pintarTablaCompact("grupos", $("side-lb-grupos"), lbRows);
+  pintarTablaCompact("eliminatorias", $("side-lb-elim"), lbRows);
 }
 
 function pintarTabla(fase, el, rows){
@@ -1171,7 +1252,7 @@ function pintarTabla(fase, el, rows){
     ${list.map((r,i) => `
       <div class="lb-row ${r.user_id === me.id ? "me" : ""}">
         <span class="col-num">${medalla(i)}</span>
-        <span class="name">${esc(r.display_name)}</span>
+        <span class="name player-link" data-uid="${r.user_id}" data-name="${esc(r.display_name)}" data-rank="${i+1}" data-pts="${r.total_points}">${esc(r.display_name)}</span>
         <span class="col-x num">${r.exact_hits}</span>
         <span class="col-r num">${r.result_hits}</span>
         <span class="col-j num">${r.scored_matches}</span>
@@ -1245,6 +1326,145 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden && me) refresh();
 });
 
+/* ---------------- FEATURE 4: COUNTDOWN ---------------- */
+function startCountdown(){
+  clearInterval(countdownInterval);
+  const now = Date.now();
+  const next = matches
+    .filter(m => m.phase === phase && new Date(m.kickoff).getTime() > now && !myPreds[m.id])
+    .sort((a,b) => new Date(a.kickoff) - new Date(b.kickoff))[0];
+  const el = $("countdown-text");
+  if (!next){ el.classList.add("hidden"); return; }
+  function tick(){
+    const diff = new Date(next.kickoff).getTime() - Date.now();
+    if (diff <= 0){ clearInterval(countdownInterval); el.classList.add("hidden"); return; }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    el.textContent = d > 0
+      ? `· Próximo en ${d}d ${h}h`
+      : `· Próximo en ${h > 0 ? h+"h " : ""}${String(m).padStart(2,"0")}m ${String(s).padStart(2,"0")}s`;
+    el.classList.remove("hidden");
+  }
+  tick();
+  countdownInterval = setInterval(tick, 1000);
+}
+
+/* ---------------- FEATURE 5: CONSENSO ---------------- */
+function renderConsensus(data, m){
+  const home = data.filter(p => p.home_pred > p.away_pred).length;
+  const draw = data.filter(p => p.home_pred === p.away_pred).length;
+  const away = data.filter(p => p.home_pred < p.away_pred).length;
+  const max  = Math.max(home, draw, away);
+  const w = (n) => n === max && n > 0 ? " winner" : "";
+  const nameOf = (t) => esc(t.split(" ")[0]);
+  return `
+    <div class="consensus">
+      <div class="consensus-label">Consenso del grupo</div>
+      <div class="consensus-row">
+        <div class="consensus-item${w(home)}">
+          <span class="c-count">${home}</span>
+          <span class="c-label">${nameOf(m.home_team)}</span>
+        </div>
+        <div class="consensus-item${w(draw)}">
+          <span class="c-count">${draw}</span>
+          <span class="c-label">Empate</span>
+        </div>
+        <div class="consensus-item${w(away)}">
+          <span class="c-count">${away}</span>
+          <span class="c-label">${nameOf(m.away_team)}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ---------------- FEATURE 3: COMPARTIR ---------------- */
+$("share-btn").onclick = () => {
+  const lines = ["⚽ *Quiniela Mundial '26*\n"];
+  for (const fase of ["grupos","eliminatorias"]){
+    const list = lbRows
+      .filter(r => r.phase === fase)
+      .sort((a,b) => b.total_points - a.total_points || b.exact_hits - a.exact_hits);
+    if (!list.length) continue;
+    lines.push(fase === "grupos" ? "*Fase de grupos*" : "*Eliminatorias*");
+    list.forEach((r,i) => {
+      const medal = i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`;
+      lines.push(`${medal} ${r.display_name.padEnd(14)} ${String(r.total_points).padStart(3)} pts ⚡${r.exact_hits}`);
+    });
+    lines.push("");
+  }
+  const text = lines.join("\n").trim();
+  if (navigator.share){
+    navigator.share({ text }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = $("share-btn");
+      const orig = btn.innerHTML;
+      btn.innerHTML = `<span class="material-symbols-rounded" style="font-size:18px">check</span>¡Copiado!`;
+      setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    });
+  }
+};
+
+/* ---------------- FEATURE 2: ESTADÍSTICAS ---------------- */
+$("stats-close-btn").onclick = () => $("stats-modal").classList.add("hidden");
+$("stats-modal").onclick = (e) => { if (e.target === $("stats-modal")) $("stats-modal").classList.add("hidden"); };
+
+document.addEventListener("click", (e) => {
+  const link = e.target.closest(".player-link");
+  if (link){
+    const rank = parseInt(link.dataset.rank, 10) || 0;
+    const pts  = parseInt(link.dataset.pts,  10) || 0;
+    openStats(link.dataset.uid, link.dataset.name, rank, pts);
+  }
+});
+
+async function openStats(userId, displayName, rank, totalPts){
+  $("stats-title").textContent = displayName;
+  $("stats-body").innerHTML = `<div class="spinner" style="margin:24px auto;width:24px;height:24px;border-width:2px"></div>`;
+  $("stats-modal").classList.remove("hidden");
+
+  const { data, error } = await db
+    .from("predictions")
+    .select("home_pred,away_pred,matches(home_team,away_team,home_score,away_score,status,kickoff,stage,group_name,phase)")
+    .eq("user_id", userId);
+
+  if (error || !data){
+    $("stats-body").innerHTML = `<p class="err">No se pudieron cargar las estadísticas.</p>`;
+    return;
+  }
+
+  const finished = data.filter(p => p.matches?.status === "FINISHED" && p.matches?.home_score != null);
+  const exact    = finished.filter(p => p.home_pred === p.matches.home_score && p.away_pred === p.matches.away_score).length;
+  const result   = finished.filter(p => Math.sign(p.home_pred - p.away_pred) === Math.sign(p.matches.home_score - p.matches.away_score)).length;
+  const pct      = finished.length > 0 ? Math.round((result / finished.length) * 100) : 0;
+  const sorted   = [...finished].sort((a,b) => new Date(a.matches.kickoff) - new Date(b.matches.kickoff));
+
+  $("stats-body").innerHTML = `
+    <div class="stats-summary">
+      <div class="stat-box"><div class="s-val">${totalPts}</div><div class="s-lbl">Puntos</div></div>
+      <div class="stat-box"><div class="s-val">${exact}</div><div class="s-lbl">Exactos</div></div>
+      <div class="stat-box"><div class="s-val">${pct}%</div><div class="s-lbl">Aciertos</div></div>
+    </div>
+    ${sorted.length > 0 ? `
+    <div class="stats-list">
+      ${sorted.map(p => {
+        const pts = p.home_pred===p.matches.home_score && p.away_pred===p.matches.away_score ? 4
+          : Math.sign(p.home_pred-p.away_pred)===Math.sign(p.matches.home_score-p.matches.away_score) ? 3 : 0;
+        return `<div class="stats-match">
+          <div>
+            <div class="sm-teams">${esc(p.matches.home_team)} vs ${esc(p.matches.away_team)}</div>
+            <div class="sm-result">${p.matches.home_score}–${p.matches.away_score}</div>
+          </div>
+          <span class="sm-pred">${p.home_pred}–${p.away_pred}</span>
+          <span class="pts-chip p${pts}">${pts > 0 ? "+"+pts : "0"} pts</span>
+        </div>`;
+      }).join("")}
+    </div>` : `<p style="color:var(--md-on-surface-var);text-align:center;padding:20px 0">Aún no hay partidos terminados.</p>`}
+  `;
+}
+
 /* ---------------- RECUPERACIÓN DE CONTRASEÑA ---------------- */
 db.auth.onAuthStateChange((event) => {
   if (event === "PASSWORD_RECOVERY") {
@@ -1252,6 +1472,10 @@ db.auth.onAuthStateChange((event) => {
     $("app").classList.add("hidden");
     $("reset-page").classList.remove("hidden");
     $("r-pass").focus();
+  } else if (event === "SIGNED_IN" && window.location.hash.includes("access_token")) {
+    // Usuario llegó desde el link de verificación de email
+    history.replaceState(null, "", location.pathname);
+    boot();
   }
 });
 
