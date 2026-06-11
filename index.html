@@ -567,6 +567,14 @@
   .medal.m2{background:#C9CDD2;color:#2C3035}
   .medal.m3{background:#CD8B5F;color:#3B1F0C}
 
+  /* leyenda debajo de la tabla de posiciones */
+  .lb-legend{
+    font-size:11px;color:var(--md-on-surface-var);
+    padding:8px 4px 0;
+    display:flex;gap:14px;flex-wrap:wrap;
+  }
+  .lb-legend span{display:inline-flex;align-items:center;gap:4px}
+
   /* =========================================================
      BANNER DE PENDIENTES
      ========================================================= */
@@ -1169,6 +1177,11 @@ function pintarTabla(fase, el, rows){
         <span class="col-j num">${r.scored_matches}</span>
         <span class="col-pts pts">${r.total_points}</span>
       </div>`).join("")}
+    <div class="lb-legend">
+      <span>⚡ Marcador exacto (4 pts)</span>
+      <span>1X2 Resultado correcto (3 pts)</span>
+      <span>J Partidos con resultado</span>
+    </div>
   `;
 }
 
