@@ -454,6 +454,17 @@
   }
   .vs{color:var(--md-on-surface-var);font-size:18px;font-weight:600}
 
+  /* Resultado final en el centro de la tarjeta */
+  .board-final{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .actual-score{
+    font-family:'Roboto Mono',monospace;font-weight:700;font-size:30px;
+    color:var(--md-primary);line-height:1;letter-spacing:2px;
+  }
+  .your-pred{
+    font-family:'Roboto Mono',monospace;font-size:12px;font-weight:500;
+    color:var(--md-on-surface-var);
+  }
+
   .match-foot{
     display:flex;justify-content:space-between;align-items:center;
     margin-top:14px;min-height:28px;
@@ -1184,7 +1195,7 @@ function matchCard(m, d){
   card.className = "match" + (isLive ? " live-card" : "");
 
   const estado = isFinal
-    ? `<span class="state fin">Final ${m.home_score}–${m.away_score}</span>`
+    ? `<span class="state fin">Final</span>`
     : isLive
       ? `<span class="state live">EN JUEGO ${m.home_score ?? 0}–${m.away_score ?? 0}</span>`
       : `<span class="state">${fmtTime.format(d)} h</span>`;
@@ -1205,13 +1216,19 @@ function matchCard(m, d){
         <input class="digit" type="number" min="0" max="20" inputmode="numeric"
                value="${pred ? pred.away_pred : ""}" data-side="a" placeholder="–" aria-label="goles visitante"/>
       </div>`;
+  } else if (isFinal && m.home_score !== null){
+    const predText = pred ? `tú: ${pred.home_pred}–${pred.away_pred}` : "sin pronóstico";
+    boardHTML = `
+      <div class="board-final">
+        <div class="actual-score">${m.home_score} – ${m.away_score}</div>
+        <div class="your-pred">${predText}</div>
+      </div>`;
   } else {
-    const digitClass = "digit locked" + (isFinal ? " final" : "");
     boardHTML = `
       <div class="board">
-        <div class="${digitClass}">${pred ? pred.home_pred : "·"}</div>
+        <div class="digit locked">${pred ? pred.home_pred : "·"}</div>
         <span class="vs">–</span>
-        <div class="${digitClass}">${pred ? pred.away_pred : "·"}</div>
+        <div class="digit locked">${pred ? pred.away_pred : "·"}</div>
       </div>`;
   }
 
