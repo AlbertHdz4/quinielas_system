@@ -2,7 +2,7 @@
 Sincroniza partidos y resultados del Mundial 2026 desde football-data.org
 hacia la tabla `matches` de Supabase.
 
-Se ejecuta como Cron Job en Render (cada 15 min recomendado).
+Se ejecuta como GitHub Action cada 15 minutos.
 La primera ejecución siembra los 104 partidos; las siguientes actualizan
 marcadores y estados.
 
@@ -17,6 +17,7 @@ Dependencias: requests  (pip install requests)
 import os
 import sys
 import requests
+from datetime import datetime, timezone
 
 FD_TOKEN = os.environ["FOOTBALL_DATA_TOKEN"]
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
@@ -33,8 +34,12 @@ def fetch_matches() -> list[dict]:
 
 def to_row(m: dict) -> dict:
     stage = m.get("stage", "")
-    score = m.get("score", {}).get("fullTime", {})
-    return {
+    # Defensive: fullTime puede ser null o ausente cuando el API aún no confirma el marcador
+    full_time = (m.get("score") or {}).get("fullTime") or {}
+    home_score = full_time.get("home")
+    away_score = full_time.get("away")
+
+    row = {
         "id": m["id"],
         "stage": stage,
         "phase": "grupos" if stage == "GROUP_STAGE" else "eliminatorias",
@@ -45,10 +50,17 @@ def to_row(m: dict) -> dict:
         "away_crest": m["awayTeam"].get("crest"),
         "kickoff": m["utcDate"],
         "status": m.get("status", "SCHEDULED"),
-        "home_score": score.get("home"),
-        "away_score": score.get("away"),
-        "updated_at": "now()",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    # Solo incluir marcadores cuando el API los devuelve; si son null no
+    # sobreescribimos un marcador ya guardado correctamente en la BD.
+    if home_score is not None:
+        row["home_score"] = home_score
+    if away_score is not None:
+        row["away_score"] = away_score
+
+    return row
 
 
 def upsert(rows: list[dict]) -> None:
@@ -72,8 +84,14 @@ def main() -> None:
     matches = fetch_matches()
     rows = [to_row(m) for m in matches]
     upsert(rows)
-    finished = sum(1 for r in rows if r["status"] == "FINISHED")
-    print(f"Sincronizados {len(rows)} partidos ({finished} finalizados).")
+
+    finished = [r for r in rows if r["status"] == "FINISHED"]
+    with_score = [r for r in finished if "home_score" in r]
+    print(f"Sincronizados {len(rows)} partidos.")
+    print(f"  Finalizados: {len(finished)} | Con marcador: {len(with_score)}")
+    for r in finished:
+        score = f"{r['home_score']}-{r['away_score']}" if "home_score" in r else "sin marcador aún"
+        print(f"  [{score}] {r['home_team']} vs {r['away_team']}")
 
 
 if __name__ == "__main__":
