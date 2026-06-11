@@ -663,6 +663,52 @@
   .prize-card.compact .prize-sub{font-size:11px}
 
   /* =========================================================
+     PICKS COMPARISON
+     ========================================================= */
+  .picks-match-card{
+    background:var(--md-surface-c-low);
+    border-radius:var(--shape-l);
+    overflow:hidden;
+    box-shadow:var(--md-elev-1);
+    margin-bottom:16px;
+  }
+  .picks-match-header{padding:14px 16px 10px;border-bottom:1px solid var(--md-outline-variant)}
+  .picks-teams{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .picks-team{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;flex:1;min-width:0}
+  .picks-team.away{justify-content:flex-end;flex-direction:row-reverse}
+  .picks-team span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .picks-vs{font-size:11px;font-weight:700;color:var(--md-on-surface-var);flex-shrink:0}
+  .picks-crest{width:26px;height:26px;object-fit:contain;flex-shrink:0}
+  .picks-meta{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--md-on-surface-var)}
+  .picks-badge{
+    font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+    padding:2px 8px;border-radius:10px;
+  }
+  .picks-badge.scheduled{background:var(--md-surface-c-highest);color:var(--md-on-surface-var)}
+  .picks-badge.live{background:#B00020;color:#fff}
+  .picks-badge.finished{background:var(--md-primary-container);color:var(--md-on-primary-cont)}
+  .picks-result{
+    text-align:center;font-family:'Roboto Mono',monospace;
+    font-weight:700;font-size:22px;color:var(--md-primary);
+    padding:6px 0 2px;
+  }
+  .picks-players{padding:4px 0}
+  .picks-row{
+    display:flex;align-items:center;
+    padding:10px 16px;gap:10px;
+    border-bottom:1px solid var(--md-outline-variant);
+  }
+  .picks-row:last-child{border-bottom:none}
+  .picks-row.me{background:var(--md-secondary-container)}
+  .picks-player-name{
+    flex:1;font-size:14px;font-weight:500;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .picks-row.me .picks-player-name{color:var(--md-on-secondary-cont)}
+  .picks-pred{font-family:'Roboto Mono',monospace;font-weight:700;font-size:15px}
+  .picks-hit{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+
+  /* =========================================================
      BANNER DE PENDIENTES
      ========================================================= */
   .pending-banner{
@@ -832,6 +878,10 @@
       <span class="indicator"><span class="material-symbols-rounded">emoji_events</span></span>
       <span class="label">Tabla</span>
     </button>
+    <button class="nav-item" data-tab="picks" aria-selected="false">
+      <span class="indicator"><span class="material-symbols-rounded">groups</span></span>
+      <span class="label">Picks</span>
+    </button>
   </aside>
 
   <main>
@@ -849,6 +899,16 @@
             <button class="chip" id="chip-elim" aria-selected="false">Eliminatorias</button>
           </div>
           <div id="matches"><div class="spinner"></div></div>
+        </section>
+
+        <section id="view-picks" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-size:13px;color:var(--md-on-surface-var)">Próximos partidos</span>
+            <button class="text-btn" id="picks-share-btn" style="display:inline-flex;align-items:center;gap:6px;font-size:13px">
+              <span class="material-symbols-rounded" style="font-size:18px">share</span>Compartir
+            </button>
+          </div>
+          <div id="picks-content"><div class="spinner"></div></div>
         </section>
 
         <section id="view-tabla" class="hidden">
@@ -892,6 +952,10 @@
       <span class="indicator"><span class="material-symbols-rounded">emoji_events</span></span>
       <span class="label">Tabla</span>
     </button>
+    <button class="nav-item" data-tab="picks" aria-selected="false">
+      <span class="indicator"><span class="material-symbols-rounded">groups</span></span>
+      <span class="label">Picks</span>
+    </button>
   </nav>
 </div>
 
@@ -928,6 +992,7 @@ let phase = "grupos";
 let saveTimers = {};
 let lbRows = [];
 let countdownInterval = null;
+let picksCache = null;
 
 /* ---------------- AUTH ---------------- */
 let signupMode = false;
@@ -1356,11 +1421,13 @@ $$(".nav-item").forEach(b => {
 function setTab(t){
   $("view-partidos").classList.toggle("hidden", t !== "partidos");
   $("view-tabla").classList.toggle("hidden", t !== "tabla");
+  $("view-picks").classList.toggle("hidden", t !== "picks");
   $$(".nav-item").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   const onPartidos = t === "partidos";
   $("content").classList.toggle("split", onPartidos);
   $("side-panel").classList.toggle("hidden", !onPartidos);
   if (t === "tabla") renderLeaderboards();
+  if (t === "picks") renderPicksGrid();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
@@ -1513,6 +1580,140 @@ async function openStats(userId, displayName, rank, totalPts){
     </div>` : `<p style="color:var(--md-on-surface-var);text-align:center;padding:20px 0">Aún no hay partidos terminados.</p>`}
   `;
 }
+
+/* ---------------- PICKS GRID ---------------- */
+async function renderPicksGrid(){
+  const el = $("picks-content");
+  el.innerHTML = '<div class="spinner"></div>';
+
+  const { data } = await db.from("picks_grid").select("*").order("kickoff", { ascending: true });
+  if (!data || !data.length){
+    el.innerHTML = `<div class="empty-state">
+      <span class="material-symbols-rounded">inbox</span>
+      <div class="title">Sin pronósticos todavía</div>
+      <div class="body-m">Cuando alguien llene su quiniela aparecerá aquí.</div>
+    </div>`;
+    return;
+  }
+
+  // Agrupar por partido preservando el orden por kickoff
+  const matchOrder = [];
+  const matchMeta  = new Map();
+  const matchPicks = new Map();
+  for (const row of data){
+    if (!matchMeta.has(row.match_id)){
+      matchOrder.push(row.match_id);
+      matchMeta.set(row.match_id, {
+        match_id:   row.match_id,
+        home_team:  row.home_team,  away_team:  row.away_team,
+        home_crest: row.home_crest, away_crest: row.away_crest,
+        kickoff:    new Date(row.kickoff),
+        status:     row.status,
+        home_score: row.home_score, away_score: row.away_score,
+      });
+      matchPicks.set(row.match_id, []);
+    }
+    matchPicks.get(row.match_id).push({
+      user_id: row.user_id, display_name: row.display_name,
+      home_pred: row.home_pred, away_pred: row.away_pred,
+    });
+  }
+
+  // Mostrar partidos próximos (no terminados) o terminados en las últimas 24h
+  const cutoff = Date.now() - 86400000;
+  const upcoming = matchOrder
+    .map(id => matchMeta.get(id))
+    .filter(m => m.status !== "FINISHED" || m.kickoff.getTime() >= cutoff)
+    .slice(0, 8);
+
+  if (!upcoming.length){
+    el.innerHTML = `<div class="empty-state">
+      <span class="material-symbols-rounded">schedule</span>
+      <div class="title">Sin partidos próximos</div>
+      <div class="body-m">Los próximos partidos con pronósticos aparecerán aquí.</div>
+    </div>`;
+    return;
+  }
+
+  picksCache = { upcoming, matchPicks };
+
+  const fmtDate = d => d.toLocaleDateString("es-MX", { weekday:"short", day:"numeric", month:"short" });
+  const fmtTime = d => d.toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" });
+  const badge = m => {
+    if (m.status === "FINISHED")                         return `<span class="picks-badge finished">Terminado</span>`;
+    if (m.status === "IN_PLAY" || m.status === "PAUSED") return `<span class="picks-badge live">En vivo</span>`;
+    return `<span class="picks-badge scheduled">Próximo</span>`;
+  };
+  const hit = (p, m) => {
+    if (m.status !== "FINISHED" || m.home_score === null) return "";
+    if (p.home_pred === m.home_score && p.away_pred === m.away_score) return "⚡";
+    if (Math.sign(p.home_pred - p.away_pred) === Math.sign(m.home_score - m.away_score)) return "✓";
+    return "✗";
+  };
+
+  el.innerHTML = upcoming.map(m => {
+    const picks = [...matchPicks.get(m.match_id)].sort((a,b) => a.display_name.localeCompare(b.display_name));
+    return `
+    <div class="picks-match-card">
+      <div class="picks-match-header">
+        <div class="picks-teams">
+          <div class="picks-team">
+            ${m.home_crest ? `<img class="picks-crest" src="${esc(m.home_crest)}" alt="" onerror="this.style.display='none'">` : ""}
+            <span>${esc(m.home_team)}</span>
+          </div>
+          <span class="picks-vs">vs</span>
+          <div class="picks-team away">
+            ${m.away_crest ? `<img class="picks-crest" src="${esc(m.away_crest)}" alt="" onerror="this.style.display='none'">` : ""}
+            <span>${esc(m.away_team)}</span>
+          </div>
+        </div>
+        <div class="picks-meta">
+          <span>${fmtDate(m.kickoff)} · ${fmtTime(m.kickoff)}</span>
+          ${badge(m)}
+        </div>
+        ${m.status === "FINISHED" && m.home_score !== null
+          ? `<div class="picks-result">${m.home_score} – ${m.away_score}</div>` : ""}
+      </div>
+      <div class="picks-players">
+        ${picks.map(p => `
+          <div class="picks-row ${p.user_id === me.id ? "me" : ""}">
+            <span class="picks-player-name">${esc(p.display_name)}</span>
+            <span class="picks-pred">${p.home_pred}–${p.away_pred}</span>
+            <span class="picks-hit">${hit(p, m)}</span>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function sharePicksGrid(){
+  if (!picksCache) return;
+  const { upcoming, matchPicks } = picksCache;
+  const fmtDate = d => d.toLocaleDateString("es-MX", { weekday:"short", day:"numeric", month:"short" });
+  const fmtTime = d => d.toLocaleTimeString("es-MX", { hour:"2-digit", minute:"2-digit" });
+  let txt = "⚽ Quiniela Mundial 2026\n\n";
+  for (const m of upcoming){
+    const picks = [...matchPicks.get(m.match_id)].sort((a,b) => a.display_name.localeCompare(b.display_name));
+    if (m.status === "FINISHED" && m.home_score !== null){
+      txt += `✅ ${m.home_team} ${m.home_score}–${m.away_score} ${m.away_team}\n`;
+    } else {
+      txt += `🆚 ${m.home_team} vs ${m.away_team}\n`;
+      txt += `   ${fmtDate(m.kickoff)} · ${fmtTime(m.kickoff)}\n`;
+    }
+    for (const p of picks) txt += `   ${p.display_name}: ${p.home_pred}–${p.away_pred}\n`;
+    txt += "\n";
+  }
+  const payload = txt.trim();
+  if (navigator.share){
+    navigator.share({ title: "Quiniela Mundial 2026 — Picks", text: payload });
+  } else {
+    navigator.clipboard.writeText(payload)
+      .then(() => alert("Picks copiados al portapapeles ✓"))
+      .catch(() => alert(payload));
+  }
+}
+
+$("picks-share-btn").onclick = sharePicksGrid;
 
 /* ---------------- RECUPERACIÓN DE CONTRASEÑA ---------------- */
 db.auth.onAuthStateChange((event) => {
