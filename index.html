@@ -633,6 +633,35 @@
   }
   .lb-legend span{display:inline-flex;align-items:center;gap:4px}
 
+  /* Premio del torneo */
+  .prize-card{
+    background:var(--md-tertiary-container);
+    border:1px solid rgba(255,212,121,.25);
+    border-radius:var(--shape-l);
+    padding:16px 20px;
+    margin-bottom:20px;
+    display:flex;align-items:center;gap:14px;
+  }
+  .prize-card .prize-icon{
+    font-size:36px;color:var(--md-tertiary);
+    font-variation-settings:'FILL' 1;flex-shrink:0;
+  }
+  .prize-card .prize-label{
+    font-size:11px;font-weight:600;letter-spacing:1.2px;
+    text-transform:uppercase;color:var(--md-tertiary);margin-bottom:2px;
+  }
+  .prize-card .prize-amount{
+    font-family:'Roboto Mono',monospace;
+    font-size:28px;font-weight:700;
+    color:var(--md-on-tertiary-cont);line-height:1;margin-bottom:4px;
+  }
+  .prize-card .prize-sub{font-size:13px;color:var(--md-on-tertiary-cont);opacity:.75}
+  .prize-card.compact{padding:10px 14px;gap:10px;margin-bottom:16px}
+  .prize-card.compact .prize-icon{font-size:24px}
+  .prize-card.compact .prize-amount{font-size:20px}
+  .prize-card.compact .prize-label{font-size:10px}
+  .prize-card.compact .prize-sub{font-size:11px}
+
   /* =========================================================
      BANNER DE PENDIENTES
      ========================================================= */
@@ -828,6 +857,7 @@
               <span class="material-symbols-rounded" style="font-size:18px">share</span>Compartir
             </button>
           </div>
+          <div id="prize-card"></div>
           <div class="lb-section">
             <h3><span class="material-symbols-rounded">emoji_events</span> Fase de grupos</h3>
             <div class="lb-card" id="lb-grupos"></div>
@@ -840,6 +870,7 @@
 
       </div>
       <div class="col-side hidden" id="side-panel">
+        <div id="prize-card-side"></div>
         <div class="lb-section">
           <h3><span class="material-symbols-rounded">emoji_events</span> Fase de grupos</h3>
           <div class="lb-card compact" id="side-lb-grupos"></div>
@@ -1213,8 +1244,26 @@ async function togglePicks(m, card){
 
 /* ---------------- TABLA ---------------- */
 async function renderLeaderboards(){
-  const { data } = await db.from("leaderboard").select("*");
+  const [{ data }, { count: playerCount }] = await Promise.all([
+    db.from("leaderboard").select("*"),
+    db.from("profiles").select("*", { count: "exact", head: true })
+  ]);
   lbRows = data || [];
+
+  const n = playerCount || 0;
+  const fmt = (n * 500).toLocaleString("es-MX");
+  const prizeHtml = (compact) => `
+    <div class="prize-card${compact ? " compact" : ""}">
+      <span class="material-symbols-rounded prize-icon">emoji_events</span>
+      <div>
+        <div class="prize-label">Premio del torneo</div>
+        <div class="prize-amount">$${fmt}</div>
+        <div class="prize-sub">${n} jugador${n !== 1 ? "es" : ""} × $500</div>
+      </div>
+    </div>`;
+  $("prize-card").innerHTML = prizeHtml(false);
+  $("prize-card-side").innerHTML = prizeHtml(true);
+
   pintarTabla("grupos", $("lb-grupos"), lbRows);
   pintarTabla("eliminatorias", $("lb-elim"), lbRows);
   pintarTablaCompact("grupos", $("side-lb-grupos"), lbRows);
