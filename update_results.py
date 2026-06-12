@@ -32,8 +32,14 @@ def fetch_matches() -> list[dict]:
     return resp.json()["matches"]
 
 
-def to_row(m: dict) -> dict:
-    stage = m.get("stage", "")
+def to_row(m: dict) -> dict | None:
+    stage = m.get("stage") or ""
+    kickoff = m.get("utcDate")
+
+    # Saltar partidos placeholder que el API devuelve sin datos esenciales
+    if not stage or not kickoff:
+        return None
+
     # Defensive: fullTime puede ser null o ausente cuando el API aún no confirma el marcador
     full_time = (m.get("score") or {}).get("fullTime") or {}
     home_score = full_time.get("home")
@@ -44,11 +50,11 @@ def to_row(m: dict) -> dict:
         "stage": stage,
         "phase": "grupos" if stage == "GROUP_STAGE" else "eliminatorias",
         "group_name": m.get("group"),
-        "home_team": m["homeTeam"].get("name") or "Por definir",
-        "away_team": m["awayTeam"].get("name") or "Por definir",
-        "home_crest": m["homeTeam"].get("crest"),
-        "away_crest": m["awayTeam"].get("crest"),
-        "kickoff": m["utcDate"],
+        "home_team": (m.get("homeTeam") or {}).get("name") or "Por definir",
+        "away_team": (m.get("awayTeam") or {}).get("name") or "Por definir",
+        "home_crest": (m.get("homeTeam") or {}).get("crest"),
+        "away_crest": (m.get("awayTeam") or {}).get("crest"),
+        "kickoff": kickoff,
         "status": m.get("status", "SCHEDULED"),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -99,7 +105,11 @@ def upsert(rows: list[dict]) -> None:
 
 def main() -> None:
     matches = fetch_matches()
-    rows = [to_row(m) for m in matches]
+    all_rows = [to_row(m) for m in matches]
+    rows = [r for r in all_rows if r is not None]
+    skipped = len(all_rows) - len(rows)
+    if skipped:
+        print(f"Saltados {skipped} partidos sin datos esenciales (placeholders del API).")
     upsert(rows)
 
     finished = [r for r in rows if r["status"] == "FINISHED"]
