@@ -45,7 +45,10 @@ def to_row(m: dict) -> dict | None:
     home_score = full_time.get("home")
     away_score = full_time.get("away")
 
-    row = {
+    # Todos los rows siempre incluyen home_score y away_score (null si el API aún no los tiene).
+    # PostgREST requiere claves uniformes en todo el batch; mezclar rows con/sin esas claves
+    # produce PGRST102. Una vez que el API devuelve el marcador real, el siguiente run lo guarda.
+    return {
         "id": m["id"],
         "stage": stage,
         "phase": "grupos" if stage == "GROUP_STAGE" else "eliminatorias",
@@ -55,22 +58,14 @@ def to_row(m: dict) -> dict | None:
         "home_crest": (m.get("homeTeam") or {}).get("crest"),
         "away_crest": (m.get("awayTeam") or {}).get("crest"),
         "kickoff": kickoff,
-        "status": m.get("status", "SCHEDULED"),
+        "status": m.get("status") or "SCHEDULED",
+        "home_score": home_score,
+        "away_score": away_score,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Solo incluir marcadores cuando el API los devuelve; si son null no
-    # sobreescribimos un marcador ya guardado correctamente en la BD.
-    if home_score is not None:
-        row["home_score"] = home_score
-    if away_score is not None:
-        row["away_score"] = away_score
 
-    return row
-
-
-def _post(rows: list[dict]) -> None:
-    """Envía un batch a Supabase; todos los rows deben tener las mismas claves."""
+def upsert(rows: list[dict]) -> None:
     if not rows:
         return
     resp = requests.post(
@@ -87,20 +82,6 @@ def _post(rows: list[dict]) -> None:
     if resp.status_code >= 300:
         print(f"Error de Supabase {resp.status_code}: {resp.text}", file=sys.stderr)
         sys.exit(1)
-
-
-def upsert(rows: list[dict]) -> None:
-    # Llamada 1: todos los campos excepto marcadores (claves uniformes en todos los rows)
-    SCORE_KEYS = {"home_score", "away_score"}
-    base_rows = [{k: v for k, v in r.items() if k not in SCORE_KEYS} for r in rows]
-    _post(base_rows)
-
-    # Llamada 2: solo los partidos donde el API devolvió marcador confirmado
-    scored_rows = [
-        {"id": r["id"], "home_score": r["home_score"], "away_score": r["away_score"]}
-        for r in rows if "home_score" in r
-    ]
-    _post(scored_rows)
 
 
 def main() -> None:
