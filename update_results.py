@@ -63,7 +63,10 @@ def to_row(m: dict) -> dict:
     return row
 
 
-def upsert(rows: list[dict]) -> None:
+def _post(rows: list[dict]) -> None:
+    """Envía un batch a Supabase; todos los rows deben tener las mismas claves."""
+    if not rows:
+        return
     resp = requests.post(
         f"{SUPABASE_URL}/rest/v1/matches?on_conflict=id",
         headers={
@@ -78,6 +81,20 @@ def upsert(rows: list[dict]) -> None:
     if resp.status_code >= 300:
         print(f"Error de Supabase {resp.status_code}: {resp.text}", file=sys.stderr)
         sys.exit(1)
+
+
+def upsert(rows: list[dict]) -> None:
+    # Llamada 1: todos los campos excepto marcadores (claves uniformes en todos los rows)
+    SCORE_KEYS = {"home_score", "away_score"}
+    base_rows = [{k: v for k, v in r.items() if k not in SCORE_KEYS} for r in rows]
+    _post(base_rows)
+
+    # Llamada 2: solo los partidos donde el API devolvió marcador confirmado
+    scored_rows = [
+        {"id": r["id"], "home_score": r["home_score"], "away_score": r["away_score"]}
+        for r in rows if "home_score" in r
+    ]
+    _post(scored_rows)
 
 
 def main() -> None:
