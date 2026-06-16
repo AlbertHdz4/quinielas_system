@@ -368,6 +368,7 @@
     margin:24px 4px 12px;
     color:var(--md-on-surface-var);
     font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;
+    scroll-margin-top:72px;
   }
   .day-divider::after{content:"";flex:1;height:1px;background:var(--md-outline-variant)}
 
@@ -1171,6 +1172,7 @@ function renderMatches(){
   }
   box.innerHTML = "";
   let lastDay = "";
+  let anchorSet = false;
   for (const m of list){
     const d = new Date(m.kickoff);
     const dayKey = fmtDay.format(d);
@@ -1179,10 +1181,21 @@ function renderMatches(){
       const h = document.createElement("p");
       h.className = "day-divider";
       h.textContent = dayKey;
+      // Primer día con partidos no terminados → anchor para el scroll automático
+      if (!anchorSet && m.status !== "FINISHED"){
+        h.id = "upcoming-anchor";
+        anchorSet = true;
+      }
       box.appendChild(h);
     }
     box.appendChild(matchCard(m, d));
   }
+  scrollToUpcoming();
+}
+
+function scrollToUpcoming(){
+  const anchor = document.getElementById("upcoming-anchor");
+  if (anchor) anchor.scrollIntoView({ behavior: "instant", block: "start" });
 }
 
 function matchCard(m, d){
@@ -1445,7 +1458,8 @@ function setTab(t){
   $("side-panel").classList.toggle("hidden", !onPartidos);
   if (t === "tabla") renderLeaderboards();
   if (t === "picks") renderPicksGrid();
-  window.scrollTo({top:0,behavior:"smooth"});
+  if (t === "partidos") scrollToUpcoming();
+  else window.scrollTo({top:0,behavior:"smooth"});
 }
 
 /* ---------------- App bar al scrollear ---------------- */
