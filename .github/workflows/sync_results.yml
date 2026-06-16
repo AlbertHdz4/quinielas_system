@@ -2,8 +2,8 @@ name: Sincronizar resultados del Mundial
 
 on:
   schedule:
-    # Cada 15 minutos durante el torneo
-    - cron: '*/15 * * * *'
+    # Cada 15 minutos, evitando los minutos :00/:15/:30/:45 (alta carga en GitHub)
+    - cron: '3,18,33,48 * * * *'
   # Permite dispararlo manualmente desde la pestaña Actions de GitHub
   # (útil para la primera ejecución que siembra los 104 partidos)
   workflow_dispatch:

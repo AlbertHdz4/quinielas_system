@@ -683,6 +683,7 @@
     overflow:hidden;
     box-shadow:var(--md-elev-1);
     margin-bottom:16px;
+    scroll-margin-top:72px;
   }
   .picks-match-header{padding:14px 16px 10px;border-bottom:1px solid var(--md-outline-variant)}
   .picks-teams{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
@@ -1682,10 +1683,13 @@ async function renderPicksGrid(){
     return "✗";
   };
 
-  el.innerHTML = upcoming.map(m => {
+  const firstUpcomingIdx = upcoming.findIndex(m => m.status !== "FINISHED");
+
+  el.innerHTML = upcoming.map((m, idx) => {
     const picks = [...matchPicks.get(m.match_id)].sort((a,b) => a.display_name.localeCompare(b.display_name));
+    const anchor = idx === firstUpcomingIdx ? ' id="picks-upcoming-anchor"' : '';
     return `
-    <div class="picks-match-card">
+    <div class="picks-match-card"${anchor}>
       <div class="picks-match-header">
         <div class="picks-teams">
           <div class="picks-team">
@@ -1715,6 +1719,12 @@ async function renderPicksGrid(){
       </div>
     </div>`;
   }).join("");
+
+  // Scroll al primer partido próximo (igual que en la pestaña Partidos)
+  requestAnimationFrame(() => {
+    const anchor = document.getElementById("picks-upcoming-anchor");
+    if (anchor) anchor.scrollIntoView({ behavior: "instant", block: "start" });
+  });
 }
 
 function sharePicksGrid(){
