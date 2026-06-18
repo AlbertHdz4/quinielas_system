@@ -922,7 +922,7 @@
           <span class="material-symbols-rounded">campaign</span>
           <div class="announce-body">
             <div class="announce-title">Nuevo sistema de puntuación</div>
-            A partir del 18 de junio, atinar el marcador exacto vale <strong>3 pts</strong> y acertar el resultado (ganar/empate/perder) vale <strong>1 pt</strong>. Los puntos anteriores se conservan con las reglas originales.
+            A partir del 18 de junio, atinar el marcador exacto vale <strong>3 pts</strong> y acertar el resultado (ganar/empate) vale <strong>1 pt</strong>. Los puntos anteriores se conservan con las reglas originales.
           </div>
           <button class="announce-close" id="announce-close-btn" aria-label="Cerrar">
             <span class="material-symbols-rounded">close</span>
@@ -1232,6 +1232,7 @@ function renderMatches(){
 }
 
 function scrollToUpcoming(){
+  if (!$("announce-banner").classList.contains("hidden")) return;
   const anchor = document.getElementById("upcoming-anchor");
   if (anchor) anchor.scrollIntoView({ behavior: "instant", block: "start" });
 }
@@ -1759,6 +1760,7 @@ async function renderPicksGrid(){
 
   // Scroll al primer partido próximo (igual que en la pestaña Partidos)
   requestAnimationFrame(() => {
+    if (!$("announce-banner").classList.contains("hidden")) return;
     const anchor = document.getElementById("picks-upcoming-anchor");
     if (anchor) anchor.scrollIntoView({ behavior: "instant", block: "start" });
   });
