@@ -732,22 +732,37 @@
   }
   .pending-banner .material-symbols-rounded{font-size:18px;flex-shrink:0}
 
-  .announce-banner{
-    background:var(--md-tertiary-container);color:var(--md-on-tertiary-cont);
-    border:1px solid rgba(255,212,121,.2);
-    border-radius:var(--shape-m);padding:12px 14px;
-    font-size:13px;font-weight:500;margin-bottom:16px;
-    display:flex;align-items:flex-start;gap:10px;
+  .announce-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;
+    display:flex;align-items:center;justify-content:center;padding:20px;
   }
-  .announce-banner .material-symbols-rounded{font-size:20px;flex-shrink:0;color:var(--md-tertiary);margin-top:1px}
-  .announce-banner .announce-body{flex:1;line-height:1.5}
-  .announce-banner .announce-title{font-weight:700;margin-bottom:2px}
-  .announce-banner .announce-close{
-    background:none;border:none;cursor:pointer;padding:2px;
-    color:var(--md-on-tertiary-cont);opacity:.7;flex-shrink:0;
-    display:flex;align-items:center;
+  .announce-modal{
+    background:var(--md-surface-c-low);border-radius:var(--shape-xl);
+    padding:24px;width:100%;max-width:380px;box-shadow:var(--md-elev-3);
+    border-top:3px solid var(--md-tertiary);
   }
-  .announce-banner .announce-close:hover{opacity:1}
+  .announce-modal .announce-icon{
+    font-size:36px;color:var(--md-tertiary);
+    font-variation-settings:'FILL' 1;margin-bottom:12px;display:block;
+  }
+  .announce-modal .announce-title{
+    font-size:18px;font-weight:700;margin-bottom:10px;color:var(--md-on-surface);
+  }
+  .announce-modal .announce-body{
+    font-size:14px;line-height:1.6;color:var(--md-on-surface-var);margin-bottom:20px;
+  }
+  .announce-modal .announce-body strong{color:var(--md-on-surface)}
+  .announce-modal .announce-check-row{
+    display:flex;align-items:center;gap:10px;margin-bottom:20px;
+    font-size:13px;color:var(--md-on-surface-var);cursor:pointer;
+  }
+  .announce-modal .announce-check-row input{accent-color:var(--md-primary);width:16px;height:16px;cursor:pointer}
+  .announce-modal .announce-btn{
+    width:100%;padding:12px;border:none;border-radius:var(--shape-l);
+    background:var(--md-primary);color:var(--md-on-primary);
+    font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .announce-modal .announce-btn:hover{opacity:.9}
 
   /* =========================================================
      MODAL DE PERFIL
@@ -917,17 +932,6 @@
   <main>
     <div class="content" id="content">
       <div id="main-col">
-
-        <div id="announce-banner" class="announce-banner hidden">
-          <span class="material-symbols-rounded">campaign</span>
-          <div class="announce-body">
-            <div class="announce-title">Nuevo sistema de puntuación</div>
-            A partir del 18 de junio, atinar el marcador exacto vale <strong>3 pts</strong> y acertar el resultado (ganar/empate) vale <strong>1 pt</strong>. Los puntos anteriores se conservan con las reglas originales.
-          </div>
-          <button class="announce-close" id="announce-close-btn" aria-label="Cerrar">
-            <span class="material-symbols-rounded">close</span>
-          </button>
-        </div>
 
         <section id="view-partidos">
           <div id="pending-banner" class="pending-banner hidden">
@@ -1129,14 +1133,16 @@ async function boot(){
   const { data: prof } = await db.from("profiles").select("display_name").eq("id", me.id).single();
   myName = prof?.display_name || "yo";
 
-  // Banner de cambio de sistema de puntuación — desaparece automáticamente el 2026-07-01
+  // Modal de cambio de sistema de puntuación — expira el 2026-06-21
   const announceExpires = new Date("2026-06-21");
   if (!localStorage.getItem("announce_scoring_v1") && new Date() < announceExpires) {
-    $("announce-banner").classList.remove("hidden");
+    $("announce-overlay").classList.remove("hidden");
   }
-  $("announce-close-btn").addEventListener("click", () => {
-    $("announce-banner").classList.add("hidden");
-    localStorage.setItem("announce_scoring_v1", "1");
+  $("announce-ok-btn").addEventListener("click", () => {
+    $("announce-overlay").classList.add("hidden");
+    if ($("announce-no-show").checked) {
+      localStorage.setItem("announce_scoring_v1", "1");
+    }
   });
 
   // Inicializa el layout split para la vista de partidos
@@ -1233,7 +1239,6 @@ function renderMatches(){
 }
 
 function scrollToUpcoming(){
-  if (!$("announce-banner").classList.contains("hidden")) return;
   const anchor = document.getElementById("upcoming-anchor");
   if (anchor) anchor.scrollIntoView({ behavior: "instant", block: "start" });
 }
@@ -1761,7 +1766,6 @@ async function renderPicksGrid(){
 
   // Scroll al primer partido próximo (igual que en la pestaña Partidos)
   requestAnimationFrame(() => {
-    if (!$("announce-banner").classList.contains("hidden")) return;
     const anchor = document.getElementById("picks-upcoming-anchor");
     if (anchor) anchor.scrollIntoView({ behavior: "instant", block: "start" });
   });
@@ -1837,5 +1841,23 @@ $("reset-btn").onclick = async () => {
 
 boot();
 </script>
+
+<div id="announce-overlay" class="announce-overlay hidden">
+  <div class="announce-modal">
+    <span class="material-symbols-rounded announce-icon">campaign</span>
+    <div class="announce-title">Nuevo sistema de puntuación</div>
+    <div class="announce-body">
+      A partir del <strong>18 de junio</strong>, las reglas de puntos cambian:<br><br>
+      ⚡ Marcador exacto → <strong>3 pts</strong><br>
+      ✅ Resultado correcto (1X2) → <strong>1 pt</strong><br><br>
+      Los puntos acumulados antes del 18 de junio se conservan con las reglas originales (4 pts / 3 pts).
+    </div>
+    <label class="announce-check-row">
+      <input type="checkbox" id="announce-no-show">
+      No volver a mostrar
+    </label>
+    <button class="announce-btn" id="announce-ok-btn">Entendido</button>
+  </div>
+</div>
 </body>
 </html>
