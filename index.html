@@ -732,6 +732,23 @@
   }
   .pending-banner .material-symbols-rounded{font-size:18px;flex-shrink:0}
 
+  .announce-banner{
+    background:var(--md-tertiary-container);color:var(--md-on-tertiary-cont);
+    border:1px solid rgba(255,212,121,.2);
+    border-radius:var(--shape-m);padding:12px 14px;
+    font-size:13px;font-weight:500;margin-bottom:16px;
+    display:flex;align-items:flex-start;gap:10px;
+  }
+  .announce-banner .material-symbols-rounded{font-size:20px;flex-shrink:0;color:var(--md-tertiary);margin-top:1px}
+  .announce-banner .announce-body{flex:1;line-height:1.5}
+  .announce-banner .announce-title{font-weight:700;margin-bottom:2px}
+  .announce-banner .announce-close{
+    background:none;border:none;cursor:pointer;padding:2px;
+    color:var(--md-on-tertiary-cont);opacity:.7;flex-shrink:0;
+    display:flex;align-items:center;
+  }
+  .announce-banner .announce-close:hover{opacity:1}
+
   /* =========================================================
      MODAL DE PERFIL
      ========================================================= */
@@ -900,6 +917,17 @@
   <main>
     <div class="content" id="content">
       <div id="main-col">
+
+        <div id="announce-banner" class="announce-banner hidden">
+          <span class="material-symbols-rounded">campaign</span>
+          <div class="announce-body">
+            <div class="announce-title">Nuevo sistema de puntuación</div>
+            A partir del 18 de junio, atinar el marcador exacto vale <strong>3 pts</strong> y acertar el resultado (ganar/empate/perder) vale <strong>1 pt</strong>. Los puntos anteriores se conservan con las reglas originales.
+          </div>
+          <button class="announce-close" id="announce-close-btn" aria-label="Cerrar">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
 
         <section id="view-partidos">
           <div id="pending-banner" class="pending-banner hidden">
@@ -1101,6 +1129,15 @@ async function boot(){
   const { data: prof } = await db.from("profiles").select("display_name").eq("id", me.id).single();
   myName = prof?.display_name || "yo";
 
+  // Banner de cambio de sistema de puntuación (se oculta al cerrar y no vuelve a aparecer)
+  if (!localStorage.getItem("announce_scoring_v1")) {
+    $("announce-banner").classList.remove("hidden");
+  }
+  $("announce-close-btn").addEventListener("click", () => {
+    $("announce-banner").classList.add("hidden");
+    localStorage.setItem("announce_scoring_v1", "1");
+  });
+
   // Inicializa el layout split para la vista de partidos
   $("content").classList.add("split");
   $("side-panel").classList.remove("hidden");
@@ -1214,10 +1251,10 @@ function matchCard(m, d){
       ? `<span class="state live">EN JUEGO ${m.home_score ?? 0}–${m.away_score ?? 0}</span>`
       : `<span class="state">${fmtTime.format(d)} h</span>`;
 
-  const grupo = m.group_name ? m.group_name.replace("Group ","Grupo ") : etiquetaStage(m.stage);
+  const grupo = m.group_name ? esc(m.group_name).replace("Group ","Grupo ") : etiquetaStage(m.stage);
 
   const crest = (url) => url
-    ? `<img src="${url}" alt="" loading="lazy" />`
+    ? `<img src="${esc(url)}" alt="" loading="lazy" />`
     : `<div class="noimg"></div>`;
 
   let boardHTML;
@@ -1262,9 +1299,9 @@ function matchCard(m, d){
   card.innerHTML = `
     <div class="match-meta"><span class="tag">${grupo}</span>${estado}</div>
     <div class="teams">
-      <div class="team">${crest(m.home_crest)}<span class="name">${m.home_team}</span></div>
+      <div class="team">${crest(m.home_crest)}<span class="name">${esc(m.home_team)}</span></div>
       ${boardHTML}
-      <div class="team">${crest(m.away_crest)}<span class="name">${m.away_team}</span></div>
+      <div class="team">${crest(m.away_crest)}<span class="name">${esc(m.away_team)}</span></div>
     </div>
     <div class="match-foot">${footHTML}</div>
     <div class="picks"></div>`;
@@ -1404,8 +1441,8 @@ function pintarTabla(fase, el, rows){
         <span class="col-pts pts">${r.total_points}</span>
       </div>`).join("")}
     <div class="lb-legend">
-      <span>⚡ Marcador exacto (4 pts)</span>
-      <span>1X2 Resultado correcto (3 pts)</span>
+      <span>⚡ Marcador exacto (3 pts desde 18-jun)</span>
+      <span>1X2 Resultado correcto (1 pt desde 18-jun)</span>
       <span>J Partidos con resultado</span>
     </div>
   `;
