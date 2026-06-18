@@ -1129,8 +1129,9 @@ async function boot(){
   const { data: prof } = await db.from("profiles").select("display_name").eq("id", me.id).single();
   myName = prof?.display_name || "yo";
 
-  // Banner de cambio de sistema de puntuación (se oculta al cerrar y no vuelve a aparecer)
-  if (!localStorage.getItem("announce_scoring_v1")) {
+  // Banner de cambio de sistema de puntuación — desaparece automáticamente el 2026-07-01
+  const announceExpires = new Date("2026-06-21");
+  if (!localStorage.getItem("announce_scoring_v1") && new Date() < announceExpires) {
     $("announce-banner").classList.remove("hidden");
   }
   $("announce-close-btn").addEventListener("click", () => {
