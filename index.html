@@ -1181,7 +1181,7 @@ function setPhase(p){
 const fmtDay = new Intl.DateTimeFormat("es-MX",{weekday:"long",day:"numeric",month:"long"});
 const fmtTime = new Intl.DateTimeFormat("es-MX",{hour:"2-digit",minute:"2-digit",hour12:false});
 
-const SCORING_CUTOFF = new Date("2026-06-18T00:00:00Z");
+const SCORING_CUTOFF = new Date("2026-06-18T06:00:00Z");
 function puntos(pred, m){
   if (m.status !== "FINISHED" || m.home_score == null) return null;
   const newRules = new Date(m.kickoff) >= SCORING_CUTOFF;
