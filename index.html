@@ -1185,7 +1185,7 @@ const SCORING_CUTOFF = new Date("2026-06-18T06:00:00Z");
 function puntos(pred, m){
   if (m.status !== "FINISHED" || m.home_score == null) return null;
   const newRules = new Date(m.kickoff) >= SCORING_CUTOFF;
-  if (pred.home_pred === m.home_score && pred.away_pred === m.away_score) return newRules ? 3 : 4;
+  if (pred.home_pred === m.home_score && pred.away_pred === m.away_score) return 4;
   if (Math.sign(pred.home_pred - pred.away_pred) === Math.sign(m.home_score - m.away_score)) return newRules ? 1 : 3;
   return 0;
 }
@@ -1451,7 +1451,7 @@ function pintarTabla(fase, el, rows){
         <span class="col-pts pts">${r.total_points}</span>
       </div>`).join("")}
     <div class="lb-legend">
-      <span>⚡ Marcador exacto (3 pts desde 18-jun)</span>
+      <span>⚡ Marcador exacto (4 pts)</span>
       <span>1X2 Resultado correcto (1 pt desde 18-jun)</span>
       <span>J Partidos con resultado</span>
     </div>
@@ -1850,9 +1850,9 @@ boot();
     <div class="announce-title">Nuevo sistema de puntuación</div>
     <div class="announce-body">
       A partir del <strong>18 de junio</strong>, las reglas de puntos cambian:<br><br>
-      ⚡ Marcador exacto → <strong>3 pts</strong><br>
+      ⚡ Marcador exacto → <strong>4 pts</strong><br>
       ✅ Resultado correcto (1X2) → <strong>1 pt</strong><br><br>
-      Los puntos acumulados antes del 18 de junio se conservan con las reglas originales (4 pts exacto / 3 pts resultado).
+      Los puntos acumulados antes del 18 de junio CDMX conservan la regla original (4 pts exacto / 3 pts resultado).
     </div>
     <label class="announce-check-row">
       <input type="checkbox" id="announce-no-show">
