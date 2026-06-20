@@ -1109,6 +1109,7 @@ let saveTimers = {};
 let lbRows = [];
 let countdownInterval = null;
 let picksCache = null;
+let evolutionChart = null;
 
 /* ---------------- AUTH ---------------- */
 let signupMode = false;
@@ -1505,7 +1506,7 @@ async function renderLeaderboards(){
 }
 
 /* ---------------- GRÁFICA DE EVOLUCIÓN ---------------- */
-let evolutionChart = null;
+// evolutionChart se declara junto a los globales (arriba) para que el IIFE del tema pueda referenciarlo sin caer en TDZ
 const CHART_COLORS = ["#FFD479","#82CFFF","#FF8A65","#CE93D8","#80DEEA","#EF9A9A","#AED581","#F48FB1"];
 
 function renderEvolutionChart(rows){
