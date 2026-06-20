@@ -1412,7 +1412,7 @@ async function renderLeaderboards(){
   const [{ data }, { count: playerCount }, { data: gridData }] = await Promise.all([
     db.from("leaderboard").select("*"),
     db.from("profiles").select("*", { count: "exact", head: true }),
-    db.from("picks_grid").select("user_id,display_name,match_id,kickoff,status,home_score,away_score,home_pred,away_pred").eq("status","FINISHED").not("home_score","is",null),
+    db.from("picks_grid").select("user_id,display_name,match_id,kickoff,status,home_team,away_team,home_score,away_score,home_pred,away_pred").eq("status","FINISHED").not("home_score","is",null),
   ]);
   lbRows = data || [];
 
