@@ -9,6 +9,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:wght@400;500;600;700&family=Roboto+Mono:wght@600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+<script>
+  (function(){
+    const t = localStorage.getItem("theme");
+    const dark = t ? t === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
   /* =========================================================
@@ -64,6 +71,44 @@
     /* Motion */
     --ease-emph: cubic-bezier(.2,0,0,1);
     --ease-std:  cubic-bezier(.2,0,0,1);
+  }
+
+  /* ── Tema claro ───────────────────────────────────────────── */
+  html[data-theme="light"]{
+    --md-primary:           #1B6E44;
+    --md-on-primary:        #FFFFFF;
+    --md-primary-container: #A8F2C8;
+    --md-on-primary-cont:   #002112;
+
+    --md-secondary:         #4D6356;
+    --md-on-secondary:      #FFFFFF;
+    --md-secondary-container:#D0E8D9;
+    --md-on-secondary-cont: #0B1F15;
+
+    --md-tertiary:          #7B5800;
+    --md-on-tertiary:       #FFFFFF;
+    --md-tertiary-container:#FFE08A;
+    --md-on-tertiary-cont:  #261900;
+
+    --md-error:             #BA1A1A;
+    --md-on-error-cont:     #410002;
+
+    --md-background:        #F5FBF4;
+    --md-on-background:     #171D19;
+    --md-surface:           #F5FBF4;
+    --md-on-surface:        #171D19;
+    --md-on-surface-var:    #3F4D44;
+    --md-outline:           #6F7D73;
+    --md-outline-variant:   #BEC9C1;
+
+    --md-surface-c-low:     #EEF4EC;
+    --md-surface-c:         #E8EEE6;
+    --md-surface-c-high:    #E2E9E0;
+    --md-surface-c-highest: #DCE3DA;
+
+    --md-elev-1: 0 1px 2px rgba(0,0,0,.08), 0 1px 3px 1px rgba(0,0,0,.04);
+    --md-elev-2: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px 2px rgba(0,0,0,.04);
+    --md-elev-3: 0 4px 8px 3px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.08);
   }
 
   *{box-sizing:border-box;margin:0;padding:0}
@@ -917,6 +962,9 @@
       <h1>Quiniela <span class="sub">Mundial '26</span></h1>
     </div>
     <div class="actions">
+      <button class="icon-btn" id="theme-btn" aria-label="Cambiar tema">
+        <span class="material-symbols-rounded" id="theme-icon">light_mode</span>
+      </button>
       <button class="icon-btn" id="refresh-btn" aria-label="Actualizar">
         <span class="material-symbols-rounded">refresh</span>
       </button>
@@ -1109,6 +1157,25 @@ function traducirError(msg){
 
 $("logout-btn").onclick = async () => { await db.auth.signOut(); location.reload(); };
 $("refresh-btn").onclick = () => refresh();
+
+/* ---------------- TEMA ---------------- */
+function applyTheme(dark){
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  $("theme-icon").textContent = dark ? "light_mode" : "dark_mode";
+  document.querySelector('meta[name="theme-color"]')
+    .setAttribute("content", dark ? "#0F1F1A" : "#F5FBF4");
+  if (evolutionChart) renderEvolutionChart(evolutionChart._gridData || []);
+}
+(function(){
+  const saved = localStorage.getItem("theme");
+  const prefersDark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(prefersDark);
+})();
+$("theme-btn").onclick = () => {
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  localStorage.setItem("theme", isDark ? "light" : "dark");
+  applyTheme(!isDark);
+};
 
 /* ---------------- PERFIL ---------------- */
 $("profile-btn").onclick = () => openProfile();
@@ -1444,6 +1511,7 @@ const CHART_COLORS = ["#FFD479","#82CFFF","#FF8A65","#CE93D8","#80DEEA","#EF9A9A
 function renderEvolutionChart(rows){
   const canvas = document.getElementById("evolution-chart");
   if (!canvas) return;
+  if (evolutionChart) evolutionChart._gridData = rows;
 
   // Ordenar por kickoff y construir índice de partidos
   const sorted = [...rows].sort((a,b) => new Date(a.kickoff) - new Date(b.kickoff));
@@ -1487,8 +1555,11 @@ function renderEvolutionChart(rows){
 
   // Labels: número de partido
   const labels = matchIds.map((_, i) => i + 1);
-  const onSurface = "#BFC9C0";
-  const grid = "rgba(255,255,255,0.07)";
+  const lightMode = document.documentElement.getAttribute("data-theme") === "light";
+  const onSurface = lightMode ? "#3F4D44" : "#BFC9C0";
+  const grid      = lightMode ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.07)";
+  const tooltipBg = lightMode ? "#FFFFFF" : "#1A211D";
+  const tooltipTitle = lightMode ? "#171D19" : "#DFE5DE";
 
   if (evolutionChart){ evolutionChart.destroy(); evolutionChart = null; }
 
@@ -1514,10 +1585,10 @@ function renderEvolutionChart(rows){
           },
         },
         tooltip: {
-          backgroundColor: "#1A211D",
-          titleColor: "#DFE5DE",
+          backgroundColor: tooltipBg,
+          titleColor: tooltipTitle,
           bodyColor: onSurface,
-          borderColor: "rgba(255,255,255,0.12)",
+          borderColor: lightMode ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)",
           borderWidth: 1,
           padding: 12,
           callbacks: {
@@ -1545,6 +1616,7 @@ function renderEvolutionChart(rows){
       },
     },
   });
+  evolutionChart._gridData = rows;
 }
 
 function pintarTabla(fase, el, rows){
