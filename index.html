@@ -16,7 +16,9 @@
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"
+        integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt"
+        crossorigin="anonymous"></script>
 <style>
   /* =========================================================
      Material Design 3 — esquema dark, primario verde mundialista
@@ -1278,11 +1280,20 @@ $("profile-save-btn").onclick = async () => {
 };
 
 /* ---------------- CARGA ---------------- */
+// Tiempo mínimo que se aprecia la pantalla de carga (aunque los datos carguen antes)
+const LOADER_MIN_MS = 2200;
+let loaderHiding = false;
 function hideLoader(){
+  if (loaderHiding) return;
   const el = $("loader-screen");
-  if (!el || el.classList.contains("fade-out")) return;
-  el.classList.add("fade-out");
-  setTimeout(() => el.classList.add("hidden"), 500);
+  if (!el) return;
+  loaderHiding = true;
+  // performance.now() = ms desde que arrancó la página; espera lo que falte para el mínimo
+  const wait = Math.max(0, LOADER_MIN_MS - performance.now());
+  setTimeout(() => {
+    el.classList.add("fade-out");
+    setTimeout(() => el.classList.add("hidden"), 500);
+  }, wait);
 }
 
 async function boot(){
