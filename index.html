@@ -861,6 +861,63 @@
   }
   @keyframes spin{to{transform:rotate(360deg)}}
 
+  /* =========================================================
+     PANTALLA DE CARGA — Mundial 2026
+     ========================================================= */
+  .loader-screen{
+    position:fixed;inset:0;z-index:200;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    background:
+      radial-gradient(120% 80% at 50% 0%, #0c3a26 0%, var(--md-background) 60%);
+    transition:opacity .45s var(--ease-emph);
+  }
+  html[data-theme="light"] .loader-screen{
+    background:radial-gradient(120% 80% at 50% 0%, #c7ecd5 0%, var(--md-background) 60%);
+  }
+  .loader-screen.fade-out{opacity:0;pointer-events:none}
+  .loader-stage{
+    position:relative;width:120px;height:140px;
+    display:flex;align-items:flex-end;justify-content:center;
+  }
+  .loader-ball{
+    font-size:56px;line-height:1;
+    animation:ball-bounce 1s var(--ease-std) infinite;
+    filter:drop-shadow(0 4px 3px rgba(0,0,0,.25));
+    will-change:transform;
+  }
+  .loader-shadow{
+    position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
+    width:54px;height:12px;border-radius:50%;
+    background:radial-gradient(closest-side, rgba(0,0,0,.32), transparent);
+    animation:shadow-pulse 1s var(--ease-std) infinite;
+  }
+  html[data-theme="light"] .loader-shadow{
+    background:radial-gradient(closest-side, rgba(0,0,0,.18), transparent);
+  }
+  @keyframes ball-bounce{
+    0%,100%{transform:translateY(-60px) rotate(-18deg)}
+    45%{transform:translateY(-60px) rotate(-18deg)}
+    55%{transform:translateY(0) rotate(8deg) scaleY(.92)}
+    65%{transform:translateY(0) rotate(12deg) scaleY(1)}
+  }
+  @keyframes shadow-pulse{
+    0%,100%{transform:translateX(-50%) scale(.55);opacity:.35}
+    55%{transform:translateX(-50%) scale(1);opacity:.85}
+    65%{transform:translateX(-50%) scale(1);opacity:.85}
+  }
+  .loader-title{
+    margin-top:14px;font-size:20px;font-weight:700;letter-spacing:.3px;
+    color:var(--md-on-surface);
+  }
+  .loader-title span{color:var(--md-primary)}
+  .loader-flags{font-size:18px;letter-spacing:4px;margin-top:2px}
+  .loader-sub{
+    font-size:12px;color:var(--md-on-surface-var);
+    text-transform:uppercase;letter-spacing:1.5px;margin-top:10px;
+    animation:loader-fade 1.4s ease-in-out infinite;
+  }
+  @keyframes loader-fade{0%,100%{opacity:.4}50%{opacity:1}}
+
   .hidden{display:none !important}
 
   @media (prefers-reduced-motion: reduce){
@@ -869,6 +926,17 @@
 </style>
 </head>
 <body>
+
+<!-- ===================== PANTALLA DE CARGA ===================== -->
+<div id="loader-screen" class="loader-screen">
+  <div class="loader-stage">
+    <div class="loader-ball">⚽</div>
+    <div class="loader-shadow"></div>
+  </div>
+  <div class="loader-title">Quiniela <span>Mundial '26</span></div>
+  <div class="loader-flags">🇲🇽 🇺🇸 🇨🇦</div>
+  <div class="loader-sub">Cargando…</div>
+</div>
 
 <!-- ===================== RESET PASSWORD ===================== -->
 <div id="reset-page" class="auth-wrap hidden">
@@ -1210,11 +1278,19 @@ $("profile-save-btn").onclick = async () => {
 };
 
 /* ---------------- CARGA ---------------- */
+function hideLoader(){
+  const el = $("loader-screen");
+  if (!el || el.classList.contains("fade-out")) return;
+  el.classList.add("fade-out");
+  setTimeout(() => el.classList.add("hidden"), 500);
+}
+
 async function boot(){
   const { data: { session } } = await db.auth.getSession();
   if (!session) {
     $("auth-page").classList.remove("hidden");
     $("app").classList.add("hidden");
+    hideLoader();
     return;
   }
   me = session.user;
@@ -1241,6 +1317,7 @@ async function boot(){
   $("side-panel").classList.remove("hidden");
 
   await refresh();
+  hideLoader();
 }
 
 async function refresh(){
@@ -2048,7 +2125,9 @@ $("reset-btn").onclick = async () => {
   boot();
 };
 
-boot();
+boot().catch(() => hideLoader());
+// Red de seguridad: si algo se cuelga, nunca dejes la pantalla de carga para siempre
+setTimeout(hideLoader, 8000);
 </script>
 
 <div id="announce-overlay" class="announce-overlay hidden">
