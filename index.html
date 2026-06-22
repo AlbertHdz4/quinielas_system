@@ -1283,13 +1283,23 @@ $("profile-save-btn").onclick = async () => {
 // Tiempo mínimo que se aprecia la pantalla de carga (aunque los datos carguen antes)
 const LOADER_MIN_MS = 2200;
 let loaderHiding = false;
+let loaderShownAt = performance.now();  // arranque inicial de la página
+
+function showLoader(){
+  const el = $("loader-screen");
+  if (!el) return;
+  el.classList.remove("hidden", "fade-out");
+  loaderHiding = false;
+  loaderShownAt = performance.now();
+}
+
 function hideLoader(){
   if (loaderHiding) return;
   const el = $("loader-screen");
   if (!el) return;
   loaderHiding = true;
-  // performance.now() = ms desde que arrancó la página; espera lo que falte para el mínimo
-  const wait = Math.max(0, LOADER_MIN_MS - performance.now());
+  // Espera lo que falte para cumplir el mínimo desde que se mostró el loader
+  const wait = Math.max(0, LOADER_MIN_MS - (performance.now() - loaderShownAt));
   setTimeout(() => {
     el.classList.add("fade-out");
     setTimeout(() => el.classList.add("hidden"), 500);
@@ -1297,6 +1307,7 @@ function hideLoader(){
 }
 
 async function boot(){
+  showLoader();
   const { data: { session } } = await db.auth.getSession();
   if (!session) {
     $("auth-page").classList.remove("hidden");
