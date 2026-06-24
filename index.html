@@ -1348,7 +1348,7 @@ async function refresh(){
   setTimeout(() => { if (btn) btn.style.transform = ""; }, 600);
   const [mRes, pRes] = await Promise.all([
     db.from("matches").select("*").order("kickoff"),
-    db.from("predictions").select("match_id,home_pred,away_pred").eq("user_id", me.id),
+    db.from("prediction_points").select("match_id,home_pred,away_pred,points").eq("user_id", me.id),
   ]);
   matches = mRes.data || [];
   myPreds = {};
@@ -1369,15 +1369,6 @@ function setPhase(p){
 
 const fmtDay = new Intl.DateTimeFormat("es-MX",{weekday:"long",day:"numeric",month:"long"});
 const fmtTime = new Intl.DateTimeFormat("es-MX",{hour:"2-digit",minute:"2-digit",hour12:false});
-
-const SCORING_CUTOFF = new Date("2026-06-18T06:00:00Z");
-function puntos(pred, m){
-  if (m.status !== "FINISHED" || m.home_score == null) return null;
-  const newRules = new Date(m.kickoff) >= SCORING_CUTOFF;
-  if (pred.home_pred === m.home_score && pred.away_pred === m.away_score) return 4;
-  if (Math.sign(pred.home_pred - pred.away_pred) === Math.sign(m.home_score - m.away_score)) return newRules ? 1 : 3;
-  return 0;
-}
 
 function renderMatches(){
   const box = $("matches");
@@ -1488,7 +1479,7 @@ function matchCard(m, d){
       <span class="helper" data-status></span>
       <span class="helper">cierra al silbatazo</span>`;
   } else {
-    const pts = pred ? puntos(pred, m) : null;
+    const pts = pred ? (pred.points ?? null) : null;
     const chip = pts == null
       ? (pred ? '<span></span>' : `<span class="helper">sin pronóstico</span>`)
       : `<span class="pts-chip p${pts}">${pts > 0 ? "+"+pts : "0"} pts</span>`;
@@ -1554,8 +1545,8 @@ async function togglePicks(m, card){
   box.innerHTML = `<div class="picks-row"><span class="name">Cargando…</span></div>`;
   box.classList.add("open");
   const { data, error } = await db
-    .from("predictions")
-    .select("user_id,home_pred,away_pred,profiles(display_name)")
+    .from("picks_grid")
+    .select("user_id,display_name,home_pred,away_pred,points")
     .eq("match_id", m.id);
   if (error || !data?.length){
     box.innerHTML = `<div class="picks-row"><span class="name">Nadie pronosticó este partido.</span></div>`;
@@ -1563,11 +1554,11 @@ async function togglePicks(m, card){
   }
   box.innerHTML = data
     .map(p => {
-      const pts = puntos(p, m);
+      const pts = p.points;
       const tag = pts == null ? "" : ` · ${pts} pts`;
       const isMe = p.user_id === me.id;
       return `<div class="picks-row${isMe ? " me" : ""}">
-        <span class="name">${esc(p.profiles?.display_name || "?")}${isMe ? " (tú)" : ""}</span>
+        <span class="name">${esc(p.display_name || "?")}${isMe ? " (tú)" : ""}</span>
         <span class="score">${p.home_pred}–${p.away_pred}${tag}</span>
       </div>`;
     })
@@ -1579,7 +1570,7 @@ async function renderLeaderboards(){
   const [{ data }, { count: playerCount }, { data: gridData }] = await Promise.all([
     db.from("leaderboard").select("*"),
     db.from("profiles").select("*", { count: "exact", head: true }),
-    db.from("picks_grid").select("user_id,display_name,match_id,kickoff,status,home_team,away_team,home_score,away_score,home_pred,away_pred").eq("status","FINISHED").not("home_score","is",null),
+    db.from("picks_grid").select("user_id,display_name,match_id,kickoff,status,home_team,away_team,home_score,away_score,home_pred,away_pred,points").eq("status","FINISHED").not("home_score","is",null),
   ]);
   lbRows = data || [];
 
@@ -1636,7 +1627,7 @@ function renderEvolutionChart(rows){
     let cum = 0;
     const data = matchIds.map(mid => {
       const pred = predMap.get(mid);
-      if (pred) cum += puntos(pred, pred) ?? 0;
+      if (pred) cum += pred.points ?? 0;
       return cum;
     });
     datasets.push({
@@ -1927,20 +1918,22 @@ async function openStats(userId, displayName, rank, totalPts){
   $("stats-modal").classList.remove("hidden");
 
   const { data, error } = await db
-    .from("predictions")
-    .select("home_pred,away_pred,matches(home_team,away_team,home_score,away_score,status,kickoff,stage,group_name,phase)")
-    .eq("user_id", userId);
+    .from("picks_grid")
+    .select("home_team,away_team,home_score,away_score,status,kickoff,home_pred,away_pred,points")
+    .eq("user_id", userId)
+    .eq("status", "FINISHED")
+    .not("home_score", "is", null);
 
   if (error || !data){
     $("stats-body").innerHTML = `<p class="err">No se pudieron cargar las estadísticas.</p>`;
     return;
   }
 
-  const finished = data.filter(p => p.matches?.status === "FINISHED" && p.matches?.home_score != null);
-  const exact    = finished.filter(p => p.home_pred === p.matches.home_score && p.away_pred === p.matches.away_score).length;
-  const result   = finished.filter(p => Math.sign(p.home_pred - p.away_pred) === Math.sign(p.matches.home_score - p.matches.away_score)).length;
+  const finished = data.filter(p => p.status === "FINISHED" && p.home_score != null);
+  const exact    = finished.filter(p => p.points === 4).length;
+  const result   = finished.filter(p => (p.points ?? 0) > 0).length;
   const pct      = finished.length > 0 ? Math.round((result / finished.length) * 100) : 0;
-  const sorted   = [...finished].sort((a,b) => new Date(a.matches.kickoff) - new Date(b.matches.kickoff));
+  const sorted   = [...finished].sort((a,b) => new Date(a.kickoff) - new Date(b.kickoff));
 
   $("stats-body").innerHTML = `
     <div class="stats-summary">
@@ -1951,11 +1944,11 @@ async function openStats(userId, displayName, rank, totalPts){
     ${sorted.length > 0 ? `
     <div class="stats-list">
       ${sorted.map(p => {
-        const pts = puntos(p, p.matches) ?? 0;
+        const pts = p.points ?? 0;
         return `<div class="stats-match">
           <div>
-            <div class="sm-teams">${esc(p.matches.home_team)} vs ${esc(p.matches.away_team)}</div>
-            <div class="sm-result">${p.matches.home_score}–${p.matches.away_score}</div>
+            <div class="sm-teams">${esc(p.home_team)} vs ${esc(p.away_team)}</div>
+            <div class="sm-result">${p.home_score}–${p.away_score}</div>
           </div>
           <span class="sm-pred">${p.home_pred}–${p.away_pred}</span>
           <span class="pts-chip p${pts}">${pts > 0 ? "+"+pts : "0"} pts</span>
