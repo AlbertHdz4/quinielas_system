@@ -567,6 +567,8 @@
   }
   .cb-status{min-height:14px}
   .cb-status.warn{color:var(--md-error)}
+  /* Variante sin ícono (para reutilizar el selector en otras apuestas, ej. amarillas) */
+  .cb-label.plain::before{content:none}
 
   /* ----- Indicador de corners en partido terminado ----- */
   .corner-line{
@@ -582,6 +584,7 @@
     font-variation-settings:'FILL' 1;color:var(--md-tertiary);
   }
   .cb-pending{font-size:12px;color:var(--md-on-surface-var);font-style:italic}
+  .cb-total.plain::before{content:none}
   .corner-badge{
     font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;
     display:inline-flex;align-items:center;gap:3px;white-space:nowrap;
@@ -589,6 +592,22 @@
   .corner-badge.hit{background:var(--md-tertiary-container);color:var(--md-on-tertiary-cont)}
   .corner-badge.miss{background:var(--md-surface-c-high);color:var(--md-on-surface-var)}
   .corner-badge.pend{background:var(--md-surface-c-high);color:var(--md-on-surface-var);font-style:italic}
+
+  /* ----- Apuesta opt-in de penales (solo eliminatorias) ----- */
+  .pen-bet{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+  .pen-toggle{
+    width:100%;padding:8px 10px;border:1px solid var(--md-outline-variant);
+    background:transparent;color:var(--md-on-surface-var);border-radius:var(--shape-m);
+    font-size:12px;font-weight:600;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    transition:background .15s,border-color .15s,color .15s;
+  }
+  .pen-toggle .material-symbols-rounded{font-size:16px}
+  .pen-toggle:hover{border-color:var(--md-tertiary)}
+  .pen-toggle.sel{background:var(--md-tertiary-container);color:var(--md-on-tertiary-cont);border-color:var(--md-tertiary)}
+  .pen-line{
+    display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:8px;
+  }
 
   /* ----- Expander de picks ----- */
   .picks{
@@ -1409,7 +1428,7 @@ async function refresh(){
   setTimeout(() => { if (btn) btn.style.transform = ""; }, 600);
   const [mRes, pRes] = await Promise.all([
     db.from("matches").select("*").order("kickoff"),
-    db.from("prediction_points").select("match_id,home_pred,away_pred,points,corner_pred,corner_pts").eq("user_id", me.id),
+    db.from("prediction_points").select("match_id,home_pred,away_pred,points,corner_pred,corner_pts,yellow_pred,yellow_pts,pen_pred,pen_pts").eq("user_id", me.id),
   ]);
   matches = mRes.data || [];
   myPreds = {};
@@ -1488,6 +1507,7 @@ function scrollToUpcoming(){
 }
 
 const CORNER_LABEL = { under: "− de 8", exact: "8 exacto", over: "+ de 8" };
+const YELLOW_LABEL = { under: "− de 3", exact: "3 exacto", over: "+ de 3" };
 
 function matchCard(m, d){
   const isLive = m.status === "IN_PLAY" || m.status === "PAUSED";
@@ -1579,6 +1599,64 @@ function matchCard(m, d){
     cornerHTML = `<div class="corner-line"><span class="cb-total">tu apuesta: ${CORNER_LABEL[cp]}</span></div>`;
   }
 
+  // ----- Apuesta de tarjetas amarillas (línea 3) -----
+  const yp = pred ? pred.yellow_pred : null;
+  let yellowHTML = "";
+  if (!started){
+    yellowHTML = `
+      <div class="corner-bet">
+        <span class="cb-label plain">🟨 Amarillas · línea 3</span>
+        <div class="cb-opts">
+          <button class="cb-opt${yp==='under'?' sel':''}" data-yc="under">− de 3</button>
+          <button class="cb-opt${yp==='exact'?' sel':''}" data-yc="exact">3 exacto</button>
+          <button class="cb-opt${yp==='over'?' sel':''}" data-yc="over">+ de 3</button>
+        </div>
+        <span class="helper cb-status" data-yc-status></span>
+      </div>`;
+  } else if (isFinal){
+    const total = (m.home_yellows != null && m.away_yellows != null) ? m.home_yellows + m.away_yellows : null;
+    if (total == null){
+      yellowHTML = `<div class="corner-line"><span class="cb-pending">Amarillas: pendiente${yp ? ` · tu apuesta: ${YELLOW_LABEL[yp]}` : ""}</span></div>`;
+    } else {
+      let mine = "";
+      if (yp){
+        const ypts = pred.yellow_pts ?? 0;
+        mine = `<span class="corner-badge ${ypts > 0 ? "hit" : "miss"}">${YELLOW_LABEL[yp]}${ypts > 0 ? ` · +${ypts}` : ""}</span>`;
+      }
+      yellowHTML = `<div class="corner-line"><span class="cb-total plain">🟨 ${total} amarillas</span>${mine}</div>`;
+    }
+  } else if (yp){
+    yellowHTML = `<div class="corner-line"><span class="cb-total plain">🟨 tu apuesta: ${YELLOW_LABEL[yp]}</span></div>`;
+  }
+
+  // ----- Apuesta opt-in de penales (solo eliminatorias) -----
+  const pp = pred ? pred.pen_pred === true : false;
+  let penHTML = "";
+  if (m.phase === "eliminatorias"){
+    if (!started){
+      penHTML = `
+        <div class="pen-bet">
+          <button class="pen-toggle${pp ? " sel" : ""}" data-pen>
+            <span class="material-symbols-rounded">sports_soccer</span>${pp ? "Apostaste: se va a penales" : "Creo que se va a penales"}
+          </button>
+          <span class="helper cb-status" data-pen-status></span>
+        </div>`;
+    } else if (isFinal){
+      const wp = m.went_penalties;  // true / false / null
+      if (wp === true){
+        const ppts = pred ? (pred.pen_pts ?? 0) : 0;
+        const badge = pp ? `<span class="corner-badge hit">penales · +${ppts}</span>` : "";
+        penHTML = `<div class="pen-line"><span class="cb-total">Se fue a penales</span>${badge}</div>`;
+      } else if (pp){
+        penHTML = wp === false
+          ? `<div class="pen-line"><span class="corner-badge miss">apostaste penales · no</span></div>`
+          : `<div class="pen-line"><span class="cb-pending">Penales: pendiente · apostaste SÍ</span></div>`;
+      }
+    } else if (pp){
+      penHTML = `<div class="pen-line"><span class="cb-total">apostaste: se va a penales</span></div>`;
+    }
+  }
+
   card.innerHTML = `
     <div class="match-meta"><span class="tag">${grupo}</span>${estado}</div>
     <div class="teams">
@@ -1587,6 +1665,8 @@ function matchCard(m, d){
       <div class="team">${crest(m.away_crest)}<span class="name">${esc(m.away_team)}</span></div>
     </div>
     ${cornerHTML}
+    ${yellowHTML}
+    ${penHTML}
     <div class="match-foot">${footHTML}</div>
     <div class="picks"></div>`;
 
@@ -1594,9 +1674,14 @@ function matchCard(m, d){
     card.querySelectorAll("input.digit").forEach(inp => {
       inp.addEventListener("input", () => queueSave(m.id, card));
     });
-    card.querySelectorAll(".cb-opt").forEach(btn => {
+    card.querySelectorAll("[data-cb]").forEach(btn => {
       btn.addEventListener("click", () => saveCorner(m.id, card, btn.dataset.cb));
     });
+    card.querySelectorAll("[data-yc]").forEach(btn => {
+      btn.addEventListener("click", () => saveYellow(m.id, card, btn.dataset.yc));
+    });
+    const penBtn = card.querySelector("[data-pen]");
+    if (penBtn) penBtn.addEventListener("click", () => savePenalties(m.id, card));
   } else {
     const t = card.querySelector(".picks-toggle");
     if (t) t.onclick = () => togglePicks(m, card);
@@ -1659,6 +1744,48 @@ async function saveCorner(matchId, card, choice){
   renderMatches();
 }
 
+// Apuesta de tarjetas amarillas (línea 3). Mismo patrón que corners: requiere marcador y alterna.
+async function saveYellow(matchId, card, choice){
+  const statusEl = card.querySelector("[data-yc-status]");
+  const h = card.querySelector('input[data-side="h"]').value;
+  const a = card.querySelector('input[data-side="a"]').value;
+  if (h === "" || a === ""){
+    if (statusEl){ statusEl.textContent = "Primero ingresa tu marcador."; statusEl.className = "helper cb-status warn"; }
+    return;
+  }
+  const current = myPreds[matchId] ? myPreds[matchId].yellow_pred : null;
+  const newChoice = current === choice ? null : choice;
+  const row = { user_id: me.id, match_id: matchId, home_pred: +h, away_pred: +a, yellow_pred: newChoice, updated_at: new Date().toISOString() };
+  const { error } = await db.from("predictions").upsert(row);
+  if (error){
+    if (statusEl){ statusEl.textContent = "No se guardó (¿ya empezó?)."; statusEl.className = "helper cb-status warn"; }
+    return;
+  }
+  myPreds[matchId] = { ...myPreds[matchId], home_pred: +h, away_pred: +a, yellow_pred: newChoice };
+  renderMatches();
+}
+
+// Apuesta opt-in de penales. Requiere marcador (la fila no existe sin él). Toca para alternar.
+async function savePenalties(matchId, card){
+  const statusEl = card.querySelector("[data-pen-status]");
+  const h = card.querySelector('input[data-side="h"]').value;
+  const a = card.querySelector('input[data-side="a"]').value;
+  if (h === "" || a === ""){
+    if (statusEl){ statusEl.textContent = "Primero ingresa tu marcador."; statusEl.className = "helper cb-status warn"; }
+    return;
+  }
+  const current = myPreds[matchId] ? myPreds[matchId].pen_pred === true : false;
+  const newVal = current ? null : true;
+  const row = { user_id: me.id, match_id: matchId, home_pred: +h, away_pred: +a, pen_pred: newVal, updated_at: new Date().toISOString() };
+  const { error } = await db.from("predictions").upsert(row);
+  if (error){
+    if (statusEl){ statusEl.textContent = "No se guardó (¿ya empezó?)."; statusEl.className = "helper cb-status warn"; }
+    return;
+  }
+  myPreds[matchId] = { ...myPreds[matchId], home_pred: +h, away_pred: +a, pen_pred: newVal };
+  renderMatches();
+}
+
 async function togglePicks(m, card){
   const box = card.querySelector(".picks");
   if (box.classList.contains("open")){ box.classList.remove("open"); return; }
@@ -1666,7 +1793,7 @@ async function togglePicks(m, card){
   box.classList.add("open");
   const { data, error } = await db
     .from("picks_grid")
-    .select("user_id,display_name,home_pred,away_pred,points,corner_pred,corner_pts")
+    .select("user_id,display_name,home_pred,away_pred,points,corner_pred,corner_pts,yellow_pred,yellow_pts,pen_pred,pen_pts")
     .eq("match_id", m.id);
   if (error || !data?.length){
     box.innerHTML = `<div class="picks-row"><span class="name">Nadie pronosticó este partido.</span></div>`;
@@ -1683,10 +1810,24 @@ async function togglePicks(m, card){
         const extra = (p.corner_pts ?? 0) > 0 ? ` +${p.corner_pts}` : "";
         corner = `<span class="corner-badge ${cls}">${CORNER_LABEL[p.corner_pred]}${extra}</span>`;
       }
+      let yellow = "";
+      if (p.yellow_pred){
+        const cls = p.yellow_pts == null ? "pend" : (p.yellow_pts > 0 ? "hit" : "miss");
+        const extra = (p.yellow_pts ?? 0) > 0 ? ` +${p.yellow_pts}` : "";
+        yellow = `<span class="corner-badge ${cls}">🟨${YELLOW_LABEL[p.yellow_pred]}${extra}</span>`;
+      }
+      let pen = "";
+      if (p.pen_pred === true){
+        const cls = p.pen_pts == null ? "pend" : (p.pen_pts > 0 ? "hit" : "miss");
+        const extra = (p.pen_pts ?? 0) > 0 ? ` +${p.pen_pts}` : "";
+        pen = `<span class="corner-badge ${cls}">penales${extra}</span>`;
+      }
       return `<div class="picks-row${isMe ? " me" : ""}">
         <span class="name">${esc(p.display_name || "?")}${isMe ? " (tú)" : ""}</span>
         <span class="score">${p.home_pred}–${p.away_pred}${tag}</span>
         ${corner}
+        ${yellow}
+        ${pen}
       </div>`;
     })
     .join("") + renderConsensus(data, m);
