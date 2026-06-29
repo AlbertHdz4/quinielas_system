@@ -540,6 +540,56 @@
   .pts-chip.p1{background:var(--md-secondary-container);color:var(--md-on-secondary-cont)}
   .pts-chip.p0{background:var(--md-surface-c-high);color:var(--md-on-surface-var)}
 
+  /* ----- Apuesta de tiros de esquina (línea 8) ----- */
+  .corner-bet{
+    margin-top:12px;padding-top:12px;border-top:1px dashed var(--md-outline-variant);
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .cb-label{
+    font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;
+    color:var(--md-on-surface-var);display:flex;align-items:center;gap:6px;
+  }
+  .cb-label::before{
+    content:"flag";font-family:'Material Symbols Rounded';font-size:15px;
+    font-variation-settings:'FILL' 1;color:var(--md-tertiary);
+  }
+  .cb-opts{display:flex;gap:6px}
+  .cb-opt{
+    flex:1;padding:8px 4px;border:1px solid var(--md-outline-variant);
+    background:transparent;color:var(--md-on-surface-var);
+    border-radius:var(--shape-m);font-size:12px;font-weight:600;cursor:pointer;
+    transition:background .15s,border-color .15s,color .15s;
+  }
+  .cb-opt:hover{border-color:var(--md-tertiary)}
+  .cb-opt.sel{
+    background:var(--md-tertiary-container);color:var(--md-on-tertiary-cont);
+    border-color:var(--md-tertiary);
+  }
+  .cb-status{min-height:14px}
+  .cb-status.warn{color:var(--md-error)}
+
+  /* ----- Indicador de corners en partido terminado ----- */
+  .corner-line{
+    display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+    margin-top:12px;padding-top:10px;border-top:1px dashed var(--md-outline-variant);
+  }
+  .cb-total{
+    font-size:12px;font-weight:600;color:var(--md-on-surface-var);
+    display:inline-flex;align-items:center;gap:5px;
+  }
+  .cb-total::before{
+    content:"flag";font-family:'Material Symbols Rounded';font-size:15px;
+    font-variation-settings:'FILL' 1;color:var(--md-tertiary);
+  }
+  .cb-pending{font-size:12px;color:var(--md-on-surface-var);font-style:italic}
+  .corner-badge{
+    font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;
+    display:inline-flex;align-items:center;gap:3px;white-space:nowrap;
+  }
+  .corner-badge.hit{background:var(--md-tertiary-container);color:var(--md-on-tertiary-cont)}
+  .corner-badge.miss{background:var(--md-surface-c-high);color:var(--md-on-surface-var)}
+  .corner-badge.pend{background:var(--md-surface-c-high);color:var(--md-on-surface-var);font-style:italic}
+
   /* ----- Expander de picks ----- */
   .picks{
     margin-top:12px;padding-top:12px;
@@ -559,6 +609,9 @@
   /* Resaltar el pick propio */
   .picks-row.me .name{color:var(--md-primary);font-weight:600}
   .picks-row.me .score{color:var(--md-primary)}
+  /* Expander "Ver picks": nombre crece, marcador y badge de corners quedan a la derecha */
+  .picks .picks-row{justify-content:flex-start;flex-wrap:wrap;gap:8px}
+  .picks .picks-row .name{flex:1;min-width:90px}
 
   /* =========================================================
      LEADERBOARD
@@ -1073,8 +1126,8 @@
             <span id="countdown-text" class="countdown hidden"></span>
           </div>
           <div class="chip-row" role="tablist">
-            <button class="chip" id="chip-grupos" aria-selected="true">Fase de grupos</button>
-            <button class="chip" id="chip-elim" aria-selected="false">Eliminatorias</button>
+            <button class="chip" id="chip-grupos" aria-selected="false">Fase de grupos</button>
+            <button class="chip" id="chip-elim" aria-selected="true">Eliminatorias</button>
           </div>
           <div id="matches"><div class="spinner"></div></div>
         </section>
@@ -1097,6 +1150,10 @@
           </div>
           <div id="prize-card"></div>
           <div class="lb-section">
+            <h3><span class="material-symbols-rounded">leaderboard</span> Total general</h3>
+            <div class="lb-card" id="lb-total"></div>
+          </div>
+          <div class="lb-section">
             <h3><span class="material-symbols-rounded">emoji_events</span> Fase de grupos</h3>
             <div class="lb-card" id="lb-grupos"></div>
           </div>
@@ -1117,6 +1174,10 @@
       </div>
       <div class="col-side hidden" id="side-panel">
         <div id="prize-card-side"></div>
+        <div class="lb-section">
+          <h3><span class="material-symbols-rounded">leaderboard</span> Total general</h3>
+          <div class="lb-card compact" id="side-lb-total"></div>
+        </div>
         <div class="lb-section">
           <h3><span class="material-symbols-rounded">emoji_events</span> Fase de grupos</h3>
           <div class="lb-card compact" id="side-lb-grupos"></div>
@@ -1174,7 +1235,7 @@ let me = null;
 let myName = "";
 let matches = [];
 let myPreds = {};
-let phase = "grupos";
+let phase = "eliminatorias";
 let saveTimers = {};
 let lbRows = [];
 let countdownInterval = null;
@@ -1348,12 +1409,12 @@ async function refresh(){
   setTimeout(() => { if (btn) btn.style.transform = ""; }, 600);
   const [mRes, pRes] = await Promise.all([
     db.from("matches").select("*").order("kickoff"),
-    db.from("prediction_points").select("match_id,home_pred,away_pred,points").eq("user_id", me.id),
+    db.from("prediction_points").select("match_id,home_pred,away_pred,points,corner_pred,corner_pts").eq("user_id", me.id),
   ]);
   matches = mRes.data || [];
   myPreds = {};
   (pRes.data || []).forEach(p => myPreds[p.match_id] = p);
-  renderMatches();
+  renderMatches(true);
   renderLeaderboards();
 }
 
@@ -1364,13 +1425,13 @@ function setPhase(p){
   phase = p;
   $("chip-grupos").setAttribute("aria-selected", p === "grupos");
   $("chip-elim").setAttribute("aria-selected", p === "eliminatorias");
-  renderMatches();
+  renderMatches(true);
 }
 
 const fmtDay = new Intl.DateTimeFormat("es-MX",{weekday:"long",day:"numeric",month:"long"});
 const fmtTime = new Intl.DateTimeFormat("es-MX",{hour:"2-digit",minute:"2-digit",hour12:false});
 
-function renderMatches(){
+function renderMatches(doScroll = false){
   const box = $("matches");
   const list = matches.filter(m => m.phase === phase);
 
@@ -1418,13 +1479,15 @@ function renderMatches(){
     }
     box.appendChild(matchCard(m, d));
   }
-  scrollToUpcoming();
+  if (doScroll) scrollToUpcoming();
 }
 
 function scrollToUpcoming(){
   const anchor = document.getElementById("upcoming-anchor");
   if (anchor) anchor.scrollIntoView({ behavior: "instant", block: "start" });
 }
+
+const CORNER_LABEL = { under: "− de 8", exact: "8 exacto", over: "+ de 8" };
 
 function matchCard(m, d){
   const isLive = m.status === "IN_PLAY" || m.status === "PAUSED";
@@ -1486,6 +1549,36 @@ function matchCard(m, d){
     footHTML = `${chip}<button class="text-btn picks-toggle">Ver picks</button>`;
   }
 
+  // ----- Apuesta de tiros de esquina (línea 8) -----
+  const cp = pred ? pred.corner_pred : null;
+  let cornerHTML = "";
+  if (!started){
+    cornerHTML = `
+      <div class="corner-bet">
+        <span class="cb-label">Esquinas · línea 8</span>
+        <div class="cb-opts">
+          <button class="cb-opt${cp==='under'?' sel':''}" data-cb="under">− de 8</button>
+          <button class="cb-opt${cp==='exact'?' sel':''}" data-cb="exact">8 exacto</button>
+          <button class="cb-opt${cp==='over'?' sel':''}" data-cb="over">+ de 8</button>
+        </div>
+        <span class="helper cb-status" data-cb-status></span>
+      </div>`;
+  } else if (isFinal){
+    const total = (m.home_corners != null && m.away_corners != null) ? m.home_corners + m.away_corners : null;
+    if (total == null){
+      cornerHTML = `<div class="corner-line"><span class="cb-pending">Esquinas: pendiente${cp ? ` · tu apuesta: ${CORNER_LABEL[cp]}` : ""}</span></div>`;
+    } else {
+      let mine = "";
+      if (cp){
+        const cpts = pred.corner_pts ?? 0;
+        mine = `<span class="corner-badge ${cpts > 0 ? "hit" : "miss"}">${CORNER_LABEL[cp]}${cpts > 0 ? ` · +${cpts}` : ""}</span>`;
+      }
+      cornerHTML = `<div class="corner-line"><span class="cb-total">${total} esquinas</span>${mine}</div>`;
+    }
+  } else if (cp){
+    cornerHTML = `<div class="corner-line"><span class="cb-total">tu apuesta: ${CORNER_LABEL[cp]}</span></div>`;
+  }
+
   card.innerHTML = `
     <div class="match-meta"><span class="tag">${grupo}</span>${estado}</div>
     <div class="teams">
@@ -1493,12 +1586,16 @@ function matchCard(m, d){
       ${boardHTML}
       <div class="team">${crest(m.away_crest)}<span class="name">${esc(m.away_team)}</span></div>
     </div>
+    ${cornerHTML}
     <div class="match-foot">${footHTML}</div>
     <div class="picks"></div>`;
 
   if (!started){
     card.querySelectorAll("input.digit").forEach(inp => {
       inp.addEventListener("input", () => queueSave(m.id, card));
+    });
+    card.querySelectorAll(".cb-opt").forEach(btn => {
+      btn.addEventListener("click", () => saveCorner(m.id, card, btn.dataset.cb));
     });
   } else {
     const t = card.querySelector(".picks-toggle");
@@ -1530,13 +1627,36 @@ function queueSave(matchId, card){
       status.textContent = "No se guardó (¿ya empezó?)";
       status.className = "helper";
     } else {
-      myPreds[matchId] = row;
+      // Merge: conserva corner_pred/corner_pts que ya existían en el caché local
+      myPreds[matchId] = { ...myPreds[matchId], ...row };
       status.textContent = "Guardado";
       status.className = "helper saved";
       // Actualiza el banner de pendientes tras guardar
       renderMatches();
     }
   }, 600);
+}
+
+// Guarda la apuesta de corners. Requiere que ya exista un marcador (la fila de predicción
+// no puede crearse sin home_pred/away_pred). Tocar la opción ya elegida la deselecciona.
+async function saveCorner(matchId, card, choice){
+  const statusEl = card.querySelector("[data-cb-status]");
+  const h = card.querySelector('input[data-side="h"]').value;
+  const a = card.querySelector('input[data-side="a"]').value;
+  if (h === "" || a === ""){
+    if (statusEl){ statusEl.textContent = "Primero ingresa tu marcador."; statusEl.className = "helper cb-status warn"; }
+    return;
+  }
+  const current = myPreds[matchId] ? myPreds[matchId].corner_pred : null;
+  const newChoice = current === choice ? null : choice;
+  const row = { user_id: me.id, match_id: matchId, home_pred: +h, away_pred: +a, corner_pred: newChoice, updated_at: new Date().toISOString() };
+  const { error } = await db.from("predictions").upsert(row);
+  if (error){
+    if (statusEl){ statusEl.textContent = "No se guardó (¿ya empezó?)."; statusEl.className = "helper cb-status warn"; }
+    return;
+  }
+  myPreds[matchId] = { ...myPreds[matchId], home_pred: +h, away_pred: +a, corner_pred: newChoice };
+  renderMatches();
 }
 
 async function togglePicks(m, card){
@@ -1546,7 +1666,7 @@ async function togglePicks(m, card){
   box.classList.add("open");
   const { data, error } = await db
     .from("picks_grid")
-    .select("user_id,display_name,home_pred,away_pred,points")
+    .select("user_id,display_name,home_pred,away_pred,points,corner_pred,corner_pts")
     .eq("match_id", m.id);
   if (error || !data?.length){
     box.innerHTML = `<div class="picks-row"><span class="name">Nadie pronosticó este partido.</span></div>`;
@@ -1557,9 +1677,16 @@ async function togglePicks(m, card){
       const pts = p.points;
       const tag = pts == null ? "" : ` · ${pts} pts`;
       const isMe = p.user_id === me.id;
+      let corner = "";
+      if (p.corner_pred){
+        const cls = p.corner_pts == null ? "pend" : (p.corner_pts > 0 ? "hit" : "miss");
+        const extra = (p.corner_pts ?? 0) > 0 ? ` +${p.corner_pts}` : "";
+        corner = `<span class="corner-badge ${cls}">${CORNER_LABEL[p.corner_pred]}${extra}</span>`;
+      }
       return `<div class="picks-row${isMe ? " me" : ""}">
         <span class="name">${esc(p.display_name || "?")}${isMe ? " (tú)" : ""}</span>
         <span class="score">${p.home_pred}–${p.away_pred}${tag}</span>
+        ${corner}
       </div>`;
     })
     .join("") + renderConsensus(data, m);
@@ -1588,8 +1715,11 @@ async function renderLeaderboards(){
   $("prize-card").innerHTML = prizeHtml(false);
   $("prize-card-side").innerHTML = prizeHtml(true);
 
+  const totalRows = aggregateTotals(lbRows);
+  pintarTabla("total", $("lb-total"), totalRows);
   pintarTabla("grupos", $("lb-grupos"), lbRows);
   pintarTabla("eliminatorias", $("lb-elim"), lbRows);
+  pintarTablaCompact("total", $("side-lb-total"), totalRows);
   pintarTablaCompact("grupos", $("side-lb-grupos"), lbRows);
   pintarTablaCompact("eliminatorias", $("side-lb-elim"), lbRows);
   renderEvolutionChart(gridData || []);
@@ -1708,6 +1838,25 @@ function renderEvolutionChart(rows){
     },
   });
   evolutionChart._gridData = rows;
+}
+
+// Suma ambas fases por jugador en filas con phase="total" (reutilizables por pintarTabla)
+function aggregateTotals(rows){
+  const byUser = new Map();
+  for (const r of rows){
+    let agg = byUser.get(r.user_id);
+    if (!agg){
+      agg = { user_id: r.user_id, display_name: r.display_name, phase: "total",
+              total_points: 0, exact_hits: 0, result_hits: 0, scored_matches: 0, corner_hits: 0 };
+      byUser.set(r.user_id, agg);
+    }
+    agg.total_points   += r.total_points   || 0;
+    agg.exact_hits     += r.exact_hits     || 0;
+    agg.result_hits    += r.result_hits    || 0;
+    agg.scored_matches += r.scored_matches || 0;
+    agg.corner_hits    += r.corner_hits    || 0;
+  }
+  return [...byUser.values()];
 }
 
 function pintarTabla(fase, el, rows){
