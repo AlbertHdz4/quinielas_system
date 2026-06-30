@@ -40,10 +40,21 @@ def to_row(m: dict) -> dict | None:
     if not stage or not kickoff:
         return None
 
-    # Defensive: fullTime puede ser null o ausente cuando el API aún no confirma el marcador
-    full_time = (m.get("score") or {}).get("fullTime") or {}
-    home_score = full_time.get("home")
-    away_score = full_time.get("away")
+    # Marcador de GOLES (90' + tiempo extra), NUNCA los penales.
+    # football-data.org pone en score.fullTime el resultado FINAL: en partidos definidos por
+    # penales eso incluye la tanda (ej. 4-3), lo cual es incorrecto para la quiniela.
+    # Para esos usamos regularTime + extraTime, que da el empate de los 120'. Para el resto,
+    # fullTime ya es el marcador correcto (en partidos normales regularTime viene null).
+    score = m.get("score") or {}
+    full_time = score.get("fullTime") or {}
+    regular_time = score.get("regularTime") or {}
+    extra_time = score.get("extraTime") or {}
+    if score.get("duration") == "PENALTY_SHOOTOUT" and regular_time.get("home") is not None:
+        home_score = (regular_time.get("home") or 0) + (extra_time.get("home") or 0)
+        away_score = (regular_time.get("away") or 0) + (extra_time.get("away") or 0)
+    else:
+        home_score = full_time.get("home")
+        away_score = full_time.get("away")
 
     # Todos los rows siempre incluyen home_score y away_score (null si el API aún no los tiene).
     # PostgREST requiere claves uniformes en todo el batch; mezclar rows con/sin esas claves
