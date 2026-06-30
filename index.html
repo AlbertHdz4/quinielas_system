@@ -835,6 +835,10 @@
     font-weight:700;font-size:22px;color:var(--md-primary);
     padding:6px 0 2px;
   }
+  .picks-stats{
+    text-align:center;font-size:12px;font-weight:600;
+    color:var(--md-on-surface-var);padding:2px 0 0;
+  }
   .picks-players{padding:4px 0}
   .picks-row{
     display:flex;align-items:center;
@@ -844,10 +848,22 @@
   .picks-row:last-child{border-bottom:none}
   .picks-row.me{background:var(--md-secondary-container)}
   .picks-player-name{
-    flex:1;font-size:14px;font-weight:500;
+    flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;
+  }
+  .picks-player-name .pk-name{
+    font-size:14px;font-weight:500;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
   .picks-row.me .picks-player-name{color:var(--md-on-secondary-cont)}
+  .pk-extras{display:flex;flex-wrap:wrap;gap:4px}
+  .pk-bet{
+    font-size:10px;font-weight:700;font-family:'Roboto Mono',monospace;
+    padding:1px 6px;border-radius:6px;display:inline-flex;align-items:center;gap:2px;
+    background:var(--md-surface-c-high);color:var(--md-on-surface-var);
+  }
+  .pk-bet.hit{background:var(--md-tertiary-container);color:var(--md-on-tertiary-cont)}
+  .pk-bet.miss{background:var(--md-surface-c-high);color:var(--md-on-surface-var);opacity:.55}
+  .pk-bet.pend{background:var(--md-surface-c-high);color:var(--md-on-surface-var)}
   .picks-pred{font-family:'Roboto Mono',monospace;font-weight:700;font-size:15px}
   .picks-hit{font-size:15px;width:18px;text-align:center;flex-shrink:0}
 
@@ -2303,12 +2319,18 @@ async function renderPicksGrid(){
         kickoff:    new Date(row.kickoff),
         status:     row.status,
         home_score: row.home_score, away_score: row.away_score,
+        home_corners: row.home_corners, away_corners: row.away_corners,
+        home_yellows: row.home_yellows, away_yellows: row.away_yellows,
+        went_penalties: row.went_penalties,
       });
       matchPicks.set(row.match_id, []);
     }
     matchPicks.get(row.match_id).push({
       user_id: row.user_id, display_name: row.display_name,
       home_pred: row.home_pred, away_pred: row.away_pred,
+      corner_pred: row.corner_pred, corner_pts: row.corner_pts,
+      yellow_pred: row.yellow_pred, yellow_pts: row.yellow_pts,
+      pen_pred: row.pen_pred, pen_pts: row.pen_pts,
     });
   }
 
@@ -2343,6 +2365,28 @@ async function renderPicksGrid(){
     if (Math.sign(p.home_pred - p.away_pred) === Math.sign(m.home_score - m.away_score)) return "✓";
     return "✗";
   };
+  // Apuestas extra de cada jugador (corners/amarillas/penales)
+  const betLabel = (pred, line) => pred === "over" ? `+${line}` : pred === "under" ? `−${line}` : `=${line}`;
+  const betCls   = (fin, pts) => (!fin || pts == null) ? "pend" : (pts > 0 ? "hit" : "miss");
+  const playerExtras = (p, m) => {
+    const fin = m.status === "FINISHED";
+    const parts = [];
+    if (p.corner_pred) parts.push(`<span class="pk-bet ${betCls(fin, p.corner_pts)}">⚑${betLabel(p.corner_pred, 8)}</span>`);
+    if (p.yellow_pred) parts.push(`<span class="pk-bet ${betCls(fin, p.yellow_pts)}">🟨${betLabel(p.yellow_pred, 3)}</span>`);
+    if (p.pen_pred === true) parts.push(`<span class="pk-bet ${betCls(fin, p.pen_pts)}">🥅sí</span>`);
+    return parts.length ? `<div class="pk-extras">${parts.join("")}</div>` : "";
+  };
+  // Totales reales del partido (solo cuando ya terminó y hay datos)
+  const matchStats = (m) => {
+    if (m.status !== "FINISHED") return "";
+    const c = (m.home_corners != null && m.away_corners != null) ? m.home_corners + m.away_corners : null;
+    const y = (m.home_yellows != null && m.away_yellows != null) ? m.home_yellows + m.away_yellows : null;
+    const bits = [];
+    if (c != null) bits.push(`⚑ ${c}`);
+    if (y != null) bits.push(`🟨 ${y}`);
+    if (m.went_penalties != null) bits.push(`🥅 ${m.went_penalties ? "sí" : "no"}`);
+    return bits.length ? `<div class="picks-stats">${bits.join(" · ")}</div>` : "";
+  };
 
   const firstUpcomingIdx = upcoming.findIndex(m => m.status !== "FINISHED");
 
@@ -2369,11 +2413,15 @@ async function renderPicksGrid(){
         </div>
         ${m.status === "FINISHED" && m.home_score !== null
           ? `<div class="picks-result">${m.home_score} – ${m.away_score}</div>` : ""}
+        ${matchStats(m)}
       </div>
       <div class="picks-players">
         ${picks.map(p => `
           <div class="picks-row ${p.user_id === me.id ? "me" : ""}">
-            <span class="picks-player-name">${esc(p.display_name)}</span>
+            <div class="picks-player-name">
+              <span class="pk-name">${esc(p.display_name)}</span>
+              ${playerExtras(p, m)}
+            </div>
             <span class="picks-pred">${p.home_pred}–${p.away_pred}</span>
             <span class="picks-hit">${hit(p, m)}</span>
           </div>`).join("")}
