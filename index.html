@@ -1870,7 +1870,7 @@ async function renderLeaderboards(){
   const [{ data }, { count: playerCount }, { data: gridData }] = await Promise.all([
     db.from("leaderboard").select("*"),
     db.from("profiles").select("*", { count: "exact", head: true }),
-    db.from("picks_grid").select("user_id,display_name,match_id,kickoff,status,home_team,away_team,home_score,away_score,home_pred,away_pred,points").eq("status","FINISHED").not("home_score","is",null),
+    db.from("picks_grid").select("user_id,display_name,match_id,kickoff,status,home_team,away_team,home_score,away_score,home_pred,away_pred,points,corner_pts,yellow_pts,pen_pts").eq("status","FINISHED").not("home_score","is",null),
   ]);
   lbRows = data || [];
 
@@ -1930,7 +1930,7 @@ function renderEvolutionChart(rows){
     let cum = 0;
     const data = matchIds.map(mid => {
       const pred = predMap.get(mid);
-      if (pred) cum += pred.points ?? 0;
+      if (pred) cum += (pred.points ?? 0) + (pred.corner_pts ?? 0) + (pred.yellow_pts ?? 0) + (pred.pen_pts ?? 0);
       return cum;
     });
     datasets.push({
