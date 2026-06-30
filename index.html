@@ -594,7 +594,10 @@
   .corner-badge.pend{background:var(--md-surface-c-high);color:var(--md-on-surface-var);font-style:italic}
 
   /* ----- Apuesta opt-in de penales (solo eliminatorias) ----- */
-  .pen-bet{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+  .pen-bet{
+    margin-top:12px;padding-top:12px;border-top:1px dashed var(--md-outline-variant);
+    display:flex;flex-direction:column;gap:6px;
+  }
   .pen-toggle{
     width:100%;padding:8px 10px;border:1px solid var(--md-outline-variant);
     background:transparent;color:var(--md-on-surface-var);border-radius:var(--shape-m);
@@ -606,7 +609,8 @@
   .pen-toggle:hover{border-color:var(--md-tertiary)}
   .pen-toggle.sel{background:var(--md-tertiary-container);color:var(--md-on-tertiary-cont);border-color:var(--md-tertiary)}
   .pen-line{
-    display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:8px;
+    display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+    margin-top:12px;padding-top:10px;border-top:1px dashed var(--md-outline-variant);
   }
 
   /* ----- Expander de picks ----- */
@@ -1670,16 +1674,16 @@ function matchCard(m, d){
     } else if (isFinal && pred){
       const wp = m.went_penalties;  // true / false / null
       if (wp === null){
-        penHTML = `<div class="pen-line"><span class="cb-pending">Penales: pendiente</span></div>`;
+        penHTML = `<div class="pen-line"><span class="cb-pending">🥅 Penales: pendiente</span></div>`;
       } else {
         const hit = (pred.pen_pts ?? 0) > 0;
         penHTML = `<div class="pen-line">
-          <span class="cb-total">Penales: ${wp ? "SÍ" : "no"}</span>
+          <span class="cb-total plain">🥅 Penales: ${wp ? "SÍ" : "no"}</span>
           <span class="corner-badge ${hit ? "hit" : "miss"}">tu: ${pp ? "sí" : "no"}${hit ? " · +1" : ""}</span>
         </div>`;
       }
     } else if (!isFinal && pp){
-      penHTML = `<div class="pen-line"><span class="cb-total">marcaste: SÍ va a penales</span></div>`;
+      penHTML = `<div class="pen-line"><span class="cb-total plain">🥅 marcaste: SÍ va a penales</span></div>`;
     }
   }
 
