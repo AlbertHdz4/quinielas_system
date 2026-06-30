@@ -682,6 +682,15 @@
     color:var(--md-tertiary);
   }
   .lb-row.me .pts{color:var(--md-on-secondary-cont)}
+  /* Nombre + sub-línea de aciertos extra (corners/amarillas/penales) */
+  .lb-row .name-cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .ex-line{display:flex;flex-wrap:wrap;gap:4px}
+  .ex-badge{
+    font-size:10px;font-weight:700;font-family:'Roboto Mono',monospace;
+    background:var(--md-surface-c-high);color:var(--md-on-surface-var);
+    padding:1px 6px;border-radius:6px;display:inline-flex;align-items:center;gap:2px;
+  }
+  .lb-row.me .ex-badge{background:rgba(0,0,0,.12)}
 
   /* Tabla compacta del panel lateral: # | Jugador | ⚡ | Pts */
   .lb-card.compact .lb-row{
@@ -1629,31 +1638,32 @@ function matchCard(m, d){
     yellowHTML = `<div class="corner-line"><span class="cb-total plain">🟨 tu apuesta: ${YELLOW_LABEL[yp]}</span></div>`;
   }
 
-  // ----- Apuesta opt-in de penales (solo eliminatorias) -----
-  const pp = pred ? pred.pen_pred === true : false;
+  // ----- Apuesta de penales (sí/no, solo eliminatorias; no marcar = "no") -----
+  const pp = pred ? pred.pen_pred === true : false;  // true = marcó "sí"
   let penHTML = "";
   if (m.phase === "eliminatorias"){
     if (!started){
       penHTML = `
         <div class="pen-bet">
           <button class="pen-toggle${pp ? " sel" : ""}" data-pen>
-            <span class="material-symbols-rounded">sports_soccer</span>${pp ? "Apostaste: se va a penales" : "Creo que se va a penales"}
+            <span class="material-symbols-rounded">sports_soccer</span>${pp ? "Marcaste: SÍ va a penales" : "¿Se va a penales? Marca si crees que SÍ"}
           </button>
+          <span class="helper">Si no marcas cuenta como “no” · acertar = +1</span>
           <span class="helper cb-status" data-pen-status></span>
         </div>`;
-    } else if (isFinal){
+    } else if (isFinal && pred){
       const wp = m.went_penalties;  // true / false / null
-      if (wp === true){
-        const ppts = pred ? (pred.pen_pts ?? 0) : 0;
-        const badge = pp ? `<span class="corner-badge hit">penales · +${ppts}</span>` : "";
-        penHTML = `<div class="pen-line"><span class="cb-total">Se fue a penales</span>${badge}</div>`;
-      } else if (pp){
-        penHTML = wp === false
-          ? `<div class="pen-line"><span class="corner-badge miss">apostaste penales · no</span></div>`
-          : `<div class="pen-line"><span class="cb-pending">Penales: pendiente · apostaste SÍ</span></div>`;
+      if (wp === null){
+        penHTML = `<div class="pen-line"><span class="cb-pending">Penales: pendiente</span></div>`;
+      } else {
+        const hit = (pred.pen_pts ?? 0) > 0;
+        penHTML = `<div class="pen-line">
+          <span class="cb-total">Penales: ${wp ? "SÍ" : "no"}</span>
+          <span class="corner-badge ${hit ? "hit" : "miss"}">tu: ${pp ? "sí" : "no"}${hit ? " · +1" : ""}</span>
+        </div>`;
       }
-    } else if (pp){
-      penHTML = `<div class="pen-line"><span class="cb-total">apostaste: se va a penales</span></div>`;
+    } else if (!isFinal && pp){
+      penHTML = `<div class="pen-line"><span class="cb-total">marcaste: SÍ va a penales</span></div>`;
     }
   }
 
@@ -1988,7 +1998,8 @@ function aggregateTotals(rows){
     let agg = byUser.get(r.user_id);
     if (!agg){
       agg = { user_id: r.user_id, display_name: r.display_name, phase: "total",
-              total_points: 0, exact_hits: 0, result_hits: 0, scored_matches: 0, corner_hits: 0 };
+              total_points: 0, exact_hits: 0, result_hits: 0, scored_matches: 0,
+              corner_hits: 0, yellow_hits: 0, pen_hits: 0 };
       byUser.set(r.user_id, agg);
     }
     agg.total_points   += r.total_points   || 0;
@@ -1996,6 +2007,8 @@ function aggregateTotals(rows){
     agg.result_hits    += r.result_hits    || 0;
     agg.scored_matches += r.scored_matches || 0;
     agg.corner_hits    += r.corner_hits    || 0;
+    agg.yellow_hits    += r.yellow_hits    || 0;
+    agg.pen_hits       += r.pen_hits       || 0;
   }
   return [...byUser.values()];
 }
@@ -2031,7 +2044,10 @@ function pintarTabla(fase, el, rows){
     ${list.map((r,i) => `
       <div class="lb-row ${r.user_id === me.id ? "me" : ""}">
         <span class="col-num">${medalla(i)}</span>
-        <span class="name player-link" data-uid="${r.user_id}" data-name="${esc(r.display_name)}" data-rank="${i+1}" data-pts="${r.total_points}">${esc(r.display_name)}</span>
+        <span class="name-cell">
+          <span class="name player-link" data-uid="${r.user_id}" data-name="${esc(r.display_name)}" data-rank="${i+1}" data-pts="${r.total_points}">${esc(r.display_name)}</span>
+          ${extrasLine(r)}
+        </span>
         <span class="col-x num">${r.exact_hits}</span>
         <span class="col-r num">${r.result_hits}</span>
         <span class="col-j num">${r.scored_matches}</span>
@@ -2041,8 +2057,18 @@ function pintarTabla(fase, el, rows){
       <span>⚡ Marcador exacto (4 pts)</span>
       <span>1X2 Resultado correcto (1 pt desde 18-jun CDMX)</span>
       <span>J Partidos con resultado</span>
+      <span>⚑ Corners · 🟨 Amarillas · 🥅 Penales acertados</span>
     </div>
   `;
+}
+
+// Sub-línea bajo el nombre con los aciertos de apuestas extra (solo si tiene alguno)
+function extrasLine(r){
+  const badges = [];
+  if (r.corner_hits) badges.push(`<span class="ex-badge" title="Corners acertados">⚑ ${r.corner_hits}</span>`);
+  if (r.yellow_hits) badges.push(`<span class="ex-badge" title="Amarillas acertadas">🟨 ${r.yellow_hits}</span>`);
+  if (r.pen_hits)    badges.push(`<span class="ex-badge" title="Penales acertados">🥅 ${r.pen_hits}</span>`);
+  return badges.length ? `<span class="ex-line">${badges.join("")}</span>` : "";
 }
 
 function pintarTablaCompact(fase, el, rows){

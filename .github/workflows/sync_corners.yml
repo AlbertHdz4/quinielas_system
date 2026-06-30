@@ -1,10 +1,9 @@
-name: Sincronizar tiros de esquina del Mundial
+name: Sincronizar corners, amarillas y penales del Mundial
 
 on:
   schedule:
     # Cada 30 min, en :15 y :45 (offset del sync de resultados que corre en :03/:18/:33/:48).
-    # Los corners solo se llenan tras el partido; el plan Free de API-Football da 100 req/día
-    # y este ritmo (≈48 llamadas base/día + estadísticas) queda holgado en eliminatorias.
+    # Los stats solo se llenan tras el partido. La API de ESPN es gratis y sin llave.
     - cron: '15,45 * * * *'
   # Permite dispararlo manualmente desde la pestaña Actions
   workflow_dispatch:
@@ -22,9 +21,8 @@ jobs:
       - name: Instalar dependencias
         run: pip install requests
 
-      - name: Sincronizar tiros de esquina
+      - name: Sincronizar corners, amarillas y penales
         run: python update_corners.py
         env:
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
