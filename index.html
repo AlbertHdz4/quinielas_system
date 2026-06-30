@@ -1843,10 +1843,12 @@ async function togglePicks(m, card){
         yellow = `<span class="corner-badge ${cls}">🟨${YELLOW_LABEL[p.yellow_pred]}${extra}</span>`;
       }
       let pen = "";
-      if (p.pen_pred === true){
-        const cls = p.pen_pts == null ? "pend" : (p.pen_pts > 0 ? "hit" : "miss");
-        const extra = (p.pen_pts ?? 0) > 0 ? ` +${p.pen_pts}` : "";
-        pen = `<span class="corner-badge ${cls}">penales${extra}</span>`;
+      if (p.pen_pts != null){
+        // Resultado conocido: muestra la predicción (sí/no) de cada quien y el +1 si acertó
+        const hit = p.pen_pts > 0;
+        pen = `<span class="corner-badge ${hit ? "hit" : "miss"}">🥅${p.pen_pred === true ? "sí" : "no"}${hit ? " +1" : ""}</span>`;
+      } else if (p.pen_pred === true){
+        pen = `<span class="corner-badge pend">🥅sí</span>`;
       }
       return `<div class="picks-row${isMe ? " me" : ""}">
         <span class="name">${esc(p.display_name || "?")}${isMe ? " (tú)" : ""}</span>
@@ -2373,7 +2375,10 @@ async function renderPicksGrid(){
     const parts = [];
     if (p.corner_pred) parts.push(`<span class="pk-bet ${betCls(fin, p.corner_pts)}">⚑${betLabel(p.corner_pred, 8)}</span>`);
     if (p.yellow_pred) parts.push(`<span class="pk-bet ${betCls(fin, p.yellow_pts)}">🟨${betLabel(p.yellow_pred, 3)}</span>`);
-    if (p.pen_pred === true) parts.push(`<span class="pk-bet ${betCls(fin, p.pen_pts)}">🥅sí</span>`);
+    // Penales: cuando ya se sabe el resultado, muestra la predicción (sí/no) de cada quien;
+    // si aún no, solo destaca a quien apostó "sí".
+    if (p.pen_pts != null) parts.push(`<span class="pk-bet ${p.pen_pts > 0 ? "hit" : "miss"}">🥅${p.pen_pred === true ? "sí" : "no"}</span>`);
+    else if (p.pen_pred === true) parts.push(`<span class="pk-bet pend">🥅sí</span>`);
     return parts.length ? `<div class="pk-extras">${parts.join("")}</div>` : "";
   };
   // Totales reales del partido (solo cuando ya terminó y hay datos)
