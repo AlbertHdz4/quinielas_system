@@ -27,6 +27,7 @@ import os
 import sys
 import unicodedata
 import requests
+from datetime import datetime, timedelta
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
@@ -175,8 +176,13 @@ def main() -> None:
         print("No hay partidos de eliminatorias pendientes de stats. Nada que hacer.")
         return
 
-    dias = sorted({m["kickoff"][:10].replace("-", "") for m in pendientes})
-    date_param = dias[0] if len(dias) == 1 else f"{dias[0]}-{dias[-1]}"
+    # ESPN agrupa los eventos por fecha en horario de EE.UU., así que un partido a primera
+    # hora UTC puede caer en el "bucket" del día anterior. Ampliamos el rango ±1 día para
+    # asegurarnos de traerlo; el macheo usa la fecha real (UTC) del evento, no la del bucket.
+    dias = sorted({m["kickoff"][:10] for m in pendientes})
+    d_min = (datetime.fromisoformat(dias[0])  - timedelta(days=1)).strftime("%Y%m%d")
+    d_max = (datetime.fromisoformat(dias[-1]) + timedelta(days=1)).strftime("%Y%m%d")
+    date_param = f"{d_min}-{d_max}"
     print(f"{len(pendientes)} partido(s) pendientes. Consultando ESPN ({date_param})…")
 
     events = fetch_espn_events(date_param)
