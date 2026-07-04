@@ -48,6 +48,7 @@ ALIASES = {
     "czechia": "czech republic",
     "turkiye": "turkey",
     "cabo verde": "cape verde",
+    "cape verde islands": "cape verde",
     "china pr": "china",
     "bosnia and herzegovina": "bosnia",
 }
